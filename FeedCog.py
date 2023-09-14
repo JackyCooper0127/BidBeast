@@ -108,10 +108,11 @@ class FeedCog(commands.Cog):
             feed = feedparser.parse(link)
 
             entries = feed['entries']
-            if entries == self.last_entries[link]:
-                print("No new entries")
-                return
-            else:
+            try:
+                if entries == self.last_entries[link]:
+                    print("No new entries")
+                    return
+            except KeyError:
                 self.session.update_entry(link, entries)
 
             routines = []
@@ -128,6 +129,4 @@ class FeedCog(commands.Cog):
 
         :param job: job to be printed
         """
-        msg = f'### Title:\n{job.title}\n{job.link}'
-        await self.user.send(msg)
-
+        await self.user.send(job.link)
