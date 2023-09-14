@@ -1,5 +1,4 @@
 import asyncio
-from collections.abc import Callable
 from typing import Union, Iterator, ClassVar
 from html import unescape
 
@@ -9,23 +8,22 @@ from discord.ext.commands.bot import Bot
 from discord.ext import commands, tasks
 from markdownify import markdownify
 
+from SessionCog import SessionCog
 from functors.StoreJobFunctor import StoreJobFunctor
 from job import Job
 
 
 class FeedCog(commands.Cog):
     bot: Bot
-    searches: list[str]
     user: Union[discord.User, None]
     store: ClassVar[StoreJobFunctor] = StoreJobFunctor()
-    last_entries: list[feedparser.FeedParserDict]
+    session: Union[SessionCog, None]
 
     def __init__(self, bot: Bot):
         print("Initializing FeedCog")
         self.bot = bot
-        self.searches = []
         self.user = None
-        self.last_entries = []
+        self.session = None
 
     @staticmethod
     def _extract_job(entry: feedparser.FeedParserDict) -> Job:
@@ -47,8 +45,17 @@ class FeedCog(commands.Cog):
 
         :return: list of processed RSS entries
         """
-        for entry in self.last_entries:
-            yield self._extract_job(entry)
+        for entries in self.last_entries.values():
+            for entry in entries:
+                yield self._extract_job(entry)
+
+    @property
+    def searches(self):
+        return self.session.searches
+
+    @property
+    def last_entries(self):
+        return self.session.last_entries
 
     @commands.command('connect')
     async def connect(self, ctx):
@@ -57,6 +64,8 @@ class FeedCog(commands.Cog):
             await ctx.send("You're already connected silly!")
             return
         self.user = ctx.author
+        self.session = SessionCog(self.bot, ctx.author)
+        await self.bot.add_cog(self.session)
         await self.user.send("Gotcha...")
 
     @commands.command('start', aliases=['start_feed'])
@@ -77,15 +86,6 @@ class FeedCog(commands.Cog):
             await self.user.send("Fetching RSS feed")
         else:
             await self.user.send("Not fetching RSS feed")
-
-    @commands.command('add')
-    async def add_search_link(self, ctx, link: str):
-        """Add link to local searches"""
-        self.searches.append(link)
-        await self.user.send(f'Added {link} to local searches')
-        await self.user.send(f'Current searches: {self.searches}')
-        if not self.fetch_feed.is_running():
-            await self.user.send("Use the `!start` command to start fetching RSS feed!")
 
     @commands.command('list')
     async def list_entries(self, ctx):
@@ -108,11 +108,11 @@ class FeedCog(commands.Cog):
             feed = feedparser.parse(link)
 
             entries = feed['entries']
-            if entries == self.last_entries:
+            if entries == self.last_entries[link]:
                 print("No new entries")
                 return
             else:
-                self.last_entries = entries
+                self.session.update_entry(link, entries)
 
             routines = []
             for job in self.jobs:
