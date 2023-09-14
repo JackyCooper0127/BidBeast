@@ -1,28 +1,21 @@
-import os
 from collections.abc import Callable
-
-from supabase import Client, create_client
-
+from typing import ClassVar
+from supabase import Client
 from job import Job
-
-
-url: str = os.environ.get("SUPABASE_URL")
-key: str = os.environ.get("SUPABASE_KEY")
+from db import SUPABASE
 
 
 class StoreJobFunctor(Callable[[Job], None]):
     """Singleton functor which stores job data on supabase"""
-    client: Client
+    client: ClassVar[Client] = SUPABASE
 
-    def __init__(self):
-        self.client = create_client(url, key)
-
-    def check_duplicate(self, job: Job):
+    @classmethod
+    def check_duplicate(cls, job: Job):
         """ Checks if job is already stored
 
         :param job: job to be checked
         """
-        identical = self.client.table('potential_jobs').select('title').eq('title', job.title).execute()
+        identical = cls.client.table('potential_jobs').select('title').eq('title', job.title).execute()
         try:
             if len(identical.data) > 0:
                 return True
@@ -30,12 +23,13 @@ class StoreJobFunctor(Callable[[Job], None]):
             pass
         return False
 
-    async def __call__(self, job: Job):
+    @classmethod
+    async def __call__(cls, job: Job):
         """ Stores job data on supabase without checking for duplicates
 
         :param job: job to be stored
         """
-        self.client.table('potential_jobs').insert({
+        cls.client.table('potential_jobs').insert({
             'title': job.title,
             'desc': job.description
         }).execute()
