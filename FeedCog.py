@@ -8,7 +8,7 @@ from discord.ext.commands.bot import Bot
 from discord.ext import commands, tasks
 from markdownify import markdownify
 
-from SessionCog import SessionCog
+from cogs.SessionCog import SessionCog
 from functors.StoreJobFunctor import StoreJobFunctor
 from job import Job
 
