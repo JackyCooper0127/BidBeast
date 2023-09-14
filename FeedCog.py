@@ -17,13 +17,13 @@ class Job(object):
         self.description = description
 
 
-class FeedHandler(commands.Cog):
+class FeedCog(commands.Cog):
     bot: Bot
     searches: list[str]
     user: Union[discord.User, None]
 
     def __init__(self, bot: Bot):
-        print("Initializing FeedHandler")
+        print("Initializing FeedCog")
         self.bot = bot
         self.searches = []
         self.user = None

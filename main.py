@@ -7,7 +7,7 @@ from discord import Intents
 from markdownify import markdownify
 from discord.ext import commands
 
-from FeedHandler import FeedHandler
+from FeedCog import FeedCog
 
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN') or ""
 if DISCORD_TOKEN == "":
@@ -23,7 +23,7 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 @bot.event
 async def on_ready():
     print(f'Logged in as {bot.user}')
-    await bot.add_cog(FeedHandler(bot))
+    await bot.add_cog(FeedCog(bot))
 
 
 @bot.command('hey', aliases=['pizza', 'punk'])
