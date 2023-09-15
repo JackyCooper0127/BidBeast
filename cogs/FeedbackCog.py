@@ -143,7 +143,7 @@ class FeedbackCog(Cog):
             self.feedback.upload()
             await self.user.send("Feedback submitted. Thanks!\n"
                                  "Any message moves onto the next job.")
-            self.state = FeedbackState.NOTHING
+            self.state = FeedbackState.WAITING
 
     async def _announce_finished(self):
         await self.user.send("So.. it turns out there are no jobs for you to provide feedback on...\n"
@@ -155,6 +155,7 @@ class FeedbackCog(Cog):
         if not self.remaining:
             await self._announce_finished()
             return
+        await self.stop_loop(ctx)
 
         self._load_job()
 
@@ -177,23 +178,25 @@ class FeedbackCog(Cog):
     async def exit_conversation(self, ctx):
         """ Exit conversation with user """
         await ctx.send("Exiting feedback mode...")
+        await self.start_loop(ctx)
         self.state = FeedbackState.NOTHING
 
     @tasks.loop(seconds=60 * 5)
     async def fetch_jobs_loop(self):
         self.fetch_jobs()
         if self.remaining:
-            await self.user.send(f"Found {self.remaining} jobs that need feedback.\nUse `!feedback begin` to process.")
+            await self.user.send(f"Found {self.remaining} jobs that need feedback.\n"
+                                 "Use `!feedback process` to begin processing.")
         else:
             return
 
     async def start_loop(self, ctx):
         self.fetch_jobs_loop.start()
-        await ctx.send("Started loop")
+        await ctx.send("> Started feedback loop")
 
     async def stop_loop(self, ctx):
         self.fetch_jobs_loop.stop()
-        await ctx.send("Stopped loop")
+        await ctx.send("> Stopped feedback loop")
 
     async def status(self):
         if self.fetch_jobs_loop.is_running():

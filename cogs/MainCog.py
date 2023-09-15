@@ -65,7 +65,7 @@ class MainCog(commands.Cog):
 
     @commands.command('feedback')
     async def feedback(self, ctx, action: Optional[str]):
-        if not self._check_user(ctx):
+        if not await self._check_user(ctx):
             return
 
         if action == 'process':
