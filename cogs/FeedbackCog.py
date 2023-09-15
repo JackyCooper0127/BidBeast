@@ -167,7 +167,7 @@ class FeedbackCog(Cog):
         if not self.remaining:
             await self._announce_finished()
             return
-        await self.stop_loop()
+        await self.disable_loop()
 
         self._load_job()
 
@@ -189,7 +189,7 @@ class FeedbackCog(Cog):
     async def exit_conversation(self):
         """ Exit conversation with user """
         await self.user.send("Exiting feedback mode...")
-        await self.start_loop()
+        await self.enable_loop()
         self.state = FeedbackState.NOTHING
 
     @tasks.loop(seconds=60 * 5)
@@ -201,11 +201,11 @@ class FeedbackCog(Cog):
         else:
             return
 
-    async def start_loop(self):
+    async def enable_loop(self):
         self.fetch_jobs_loop.start()
         await self.user.send("> Started feedback loop")
 
-    async def stop_loop(self):
+    async def disable_loop(self):
         self.fetch_jobs_loop.stop()
         await self.user.send("> Stopped feedback loop")
 

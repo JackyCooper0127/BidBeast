@@ -25,7 +25,7 @@ class JobFeedCog(Cog):
         self.session = SessionCog(bot, user)
 
     async def cog_load(self):
-        await self.start_feed()
+        await self.enable_loop()
 
     @staticmethod
     def _extract_job(entry: feedparser.FeedParserDict) -> Job:
@@ -81,12 +81,12 @@ class JobFeedCog(Cog):
         for job in self.jobs:
             await ctx.send(f'{job.link}')
 
-    async def start_feed(self):
+    async def enable_loop(self):
         """Start the fetching RSS feed"""
         self.fetch_feed.start()
         await self.user.send("> Started to fetch RSS feed")
 
-    async def stop_feed(self):
+    async def disable_loop(self):
         """Stop the fetching RSS feed"""
         self.fetch_feed.stop()
         await self.user.send("> Stopped fetching RSS feed")

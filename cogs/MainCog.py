@@ -54,14 +54,14 @@ class MainCog(commands.Cog):
             await ctx.send(f"Current searches\n: {self.job_feed.session.searches}")
         elif action == 'list':
             await self.job_feed.list_entries(ctx)
-        elif action == 'start':
-            await self.job_feed.start_feed()
-        elif action == 'stop':
-            await self.job_feed.stop_feed()
+        elif action == 'enable':
+            await self.job_feed.enable_loop()
+        elif action == 'disable':
+            await self.job_feed.disable_loop()
         elif action == 'status':
             await self.job_feed.status(ctx)
         else:
-            await ctx.send("Invalid action. Please use 'add', 'remove', 'list', 'start', 'status' or 'stop'")
+            await ctx.send("Invalid action. Please use `add`, `remove`, `list`, `enable`, `disable` or `status`")
 
     @commands.command('feedback')
     async def feedback(self, ctx, action: Optional[str]):
@@ -72,17 +72,17 @@ class MainCog(commands.Cog):
             await self.feedback.begin_conversation()
         elif action == 'exit':
             await self.feedback.exit_conversation()
-        elif action == 'start':
-            await self.feedback.start_loop()
+        elif action == 'enable':
+            await self.feedback.enable_loop()
+        elif action == 'disable':
+            await self.feedback.disable_loop()
         elif action == 'fetch':
             self.feedback.fetch_jobs()
             await ctx.send(f"Fetched {len(self.feedback.query_cache)} jobs that require feedback.")
-        elif action == 'stop':
-            await self.feedback.stop_loop()
         elif action == 'status':
             await self.feedback.status()
         else:
-            await ctx.send("Invalid action. Please use `start`, `stop`, `fetch`, 'process', or `status`.")
+            await ctx.send("Invalid action. Please use `enable`, `disable`, `fetch`, `process`, `exit`, or `status`.")
 
     async def _check_user(self, ctx) -> bool:
         """Check if user is connected to the bot"""
