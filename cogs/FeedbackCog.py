@@ -70,19 +70,19 @@ class FeedbackCog(Cog):
         self.query_cache = {}
 
         # populate `query_cache` with jobs from supabase
-        self._fetch_jobs()
+        self.fetch_jobs()
 
         self.state = FeedbackState.NOTHING
 
     async def cog_load(self):
-        await self.ctx.send("\n***\n"
+        await self.ctx.send("\n# # #\n"
                             "So you ready to provide feedback?...\n"
-                            "Use `fetch` to fetch jobs that need feedback\n"
+                            "Use `!feedback fetch` to fetch jobs that need feedback\n"
                             "Run `!feedback stop` if you have to leave feedback mode."
-                            "\n***")
-        await self.begin_conversation()
+                            "\n# # #")
+        await self._begin_conversation()
 
-    def _fetch_jobs(self):
+    def fetch_jobs(self):
         """ Fetch jobs from supabase that need feedback """
         results = SUPABASE.table("potential_jobs") \
             .select("id", "title", "desc", count=CountMethod.exact) \
@@ -101,7 +101,7 @@ class FeedbackCog(Cog):
 
     async def _extract_like(self, message):
         """ Parse like/dislike from message """
-        msg = message['content'].lower()
+        msg = message.content.lower()
         if msg in ['yes', 'y', 'like']:
             self.feedback.like = LikeState.LIKE
             return
@@ -111,12 +111,12 @@ class FeedbackCog(Cog):
         elif msg in ['skip', 'pass', 'next']:
             return
 
-        await message['channel'].send("Invalid response. Please respond with 'yes', 'no', or 'skip'")
+        await self.ctx.send("Invalid response. Please respond with 'yes', 'no', or 'skip'")
 
     async def _extract_reason(self, message):
-        lines = message['content'].strip().split('\n')
+        lines = message.content.strip().split('\n')
         if not lines:
-            await message['channel'].send("Invalid response. Please provide your comments on this job description.")
+            await self.ctx.send("Invalid response. Please provide your comments on this job description.")
             return
         self.feedback.reasons = lines
 
@@ -125,16 +125,13 @@ class FeedbackCog(Cog):
         if message.author != self.ctx.author:
             return
         if self.state == FeedbackState.NOTHING:
-            msg = message.content.lower()
-            if msg == 'fetch':
-                self._fetch_jobs()
-                await message.channel.send(f"Fetched {len(self.query_cache)} jobs that require feedback.")
-                await message.channel.send(f"Press any key to begin feedback.")
-            else:
-                await self.begin_conversation()
+            if len(self.query_cache) > 0:
+                await self._begin_conversation()
                 self.state = FeedbackState.WAITING
+            else:
+                await self._announce_finished()
         elif self.state == FeedbackState.WAITING:
-            if _get_yes_no(message):
+            if await _get_yes_no(message):
                 await self.ctx.send("Great! Let's get started.")
                 await self.ctx.send("First, would you bid on this job? (yes/no/skip)")
                 self.state = FeedbackState.LIKE
@@ -146,21 +143,23 @@ class FeedbackCog(Cog):
             await self._extract_reason(message)
             # send feedback to supabase
             self.feedback.upload()
-            await self.ctx.send("Feedback submitted. Thanks!")
+            await self.ctx.send("Feedback submitted. Thanks!\n"
+                                "Any message moves onto the next job.")
             self.state = FeedbackState.NOTHING
 
-    async def begin_conversation(self):
+    async def _announce_finished(self):
+        await self.ctx.send("So.. it turns out there are no jobs for you to provide feedback on...\n"
+                            "...so congrats...\n"
+                            "You can exit by using `!feedback stop`")
+
+    async def _begin_conversation(self):
         """ Start conversation with user """
-        if len(self.query_cache) > 0:
-            self._load_job()
+        self._load_job()
 
-            await self.ctx.send(f"\n***\n{self.job.title}\n***\n")
+        await self.ctx.send(f"\n# # #\n{self.job.title}\n# # #\n")
 
-            # TODO: split description into multiple messages
-            await self.ctx.send(f"### Description"
-                                "\n{self.job.description}\n"
-                                "***")
-            await self.ctx.send(f"Would you like to give feedback? (yes/no)\n")
-        else:
-            await self.ctx.send("So.. it turns out there are no jobs for you to provide feedback on...")
-            await self.ctx.send("...so congrats...")
+        # TODO: split description into multiple messages
+        await self.ctx.send("### Description"
+                            f"\n{self.job.description}\n"
+                            "# # #"
+                            "Would you like to give feedback? (yes/no)\n")

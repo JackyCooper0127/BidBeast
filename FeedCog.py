@@ -104,6 +104,12 @@ class FeedCog(commands.Cog):
         if action == 'start':
             self.feedback = FeedbackCog(ctx)
             await self.bot.add_cog(self.feedback)
+        elif action == 'fetch':
+            if self.feedback is not None:
+                self.feedback.fetch_jobs()
+                await ctx.send(f"Fetched {len(self.feedback.query_cache)} jobs that require feedback.")
+            else:
+                await ctx.send("Please start feedback mode first.")
         elif action == 'stop':
             self.feedback = None
             await self.bot.remove_cog('FeedbackCog')
