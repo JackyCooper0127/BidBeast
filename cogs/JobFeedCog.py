@@ -84,15 +84,15 @@ class JobFeedCog(Cog):
     async def start_feed(self):
         """Start the fetching RSS feed"""
         self.fetch_feed.start()
-        await self.user.send("Started to fetch RSS feed")
+        await self.user.send("> Started to fetch RSS feed")
 
     async def stop_feed(self):
         """Stop the fetching RSS feed"""
         self.fetch_feed.stop()
-        await self.user.send("Stopped fetching RSS feed")
+        await self.user.send("> Stopped fetching RSS feed")
 
     async def status(self, ctx):
         if self.fetch_feed.is_running():
-            await ctx.send("Fetching RSS feed")
+            await ctx.send("> Fetching RSS feed")
         else:
-            await ctx.send("Not fetching RSS feed")
+            await ctx.send("> Not fetching RSS feed")

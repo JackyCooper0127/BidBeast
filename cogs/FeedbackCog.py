@@ -78,7 +78,7 @@ class FeedbackCog(Cog):
 
     async def cog_load(self):
         self.fetch_jobs_loop.start()
-        await self.user.send("Started to fetch jobs that need feedback")
+        await self.user.send("> Started to fetch jobs that need feedback")
 
     def fetch_jobs(self):
         """ Fetch jobs from supabase that need feedback """
