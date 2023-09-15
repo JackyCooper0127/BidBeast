@@ -78,6 +78,8 @@ class MainCog(commands.Cog):
             self.feedback = None
             await self.bot.remove_cog('FeedbackCog')
             await ctx.send("Stopped feedback")
+        elif action == 'status':
+            await self.feedback.status()
         else:
             await ctx.send("Invalid action. Please use `start`, `stop`, or `fetch`.")
 
