@@ -1,7 +1,7 @@
 import discord
 from discord.ext import commands
 
-from cogs.FeedCog import FeedCog
+from cogs.MainCog import MainCog
 
 
 intents = discord.Intents.default()
@@ -14,4 +14,4 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 @bot.event
 async def on_ready():
     print(f'Logged in as {bot.user}')
-    await bot.add_cog(FeedCog(bot))
+    await bot.add_cog(MainCog(bot))

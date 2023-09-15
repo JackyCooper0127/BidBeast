@@ -14,7 +14,7 @@ from functors.StoreJobFunctor import StoreJobFunctor
 from job import Job
 
 
-class FeedCog(commands.Cog):
+class MainCog(commands.Cog):
     bot: Bot
     user: Union[discord.User, None]
     store: ClassVar[StoreJobFunctor] = StoreJobFunctor()
@@ -22,7 +22,7 @@ class FeedCog(commands.Cog):
     feedback: Union[FeedbackCog, None]
 
     def __init__(self, bot: Bot):
-        print("Initializing FeedCog")
+        print("Initializing MainCog")
         self.bot = bot
         self.user = None
         self.session = None
