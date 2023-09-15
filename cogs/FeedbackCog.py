@@ -176,7 +176,7 @@ class FeedbackCog(Cog):
     async def fetch_jobs_loop(self):
         self.fetch_jobs()
         if self.remaining:
-            await self.user.send(f"Found {self.remaining} jobs that need feedback.")
+            await self.user.send(f"Found {self.remaining} jobs that need feedback.\nUse `!feedback begin` to process.")
         else:
             return
 
