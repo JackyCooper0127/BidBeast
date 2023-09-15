@@ -51,7 +51,7 @@ class JobFeedCog(Cog):
             for entry in entries:
                 yield self._extract_job(entry)
 
-    @tasks.loop(seconds=60)
+    @tasks.loop(seconds=60 * 5)
     async def fetch_feed(self):
         """Fetch RSS feed and store in database"""
         for link in self.session.searches:

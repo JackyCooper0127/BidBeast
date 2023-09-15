@@ -29,10 +29,9 @@ class FeedbackModel(object):
 
     def upload(self):
         SUPABASE.table('potential_jobs') \
-            .update({
-            'like': self.like.value,
-            'reasons': self.reasons
-        }) \
+            .update({'like': self.like.value,
+                     'reasons': self.reasons
+                     }) \
             .eq('id', self.uuid) \
             .execute()
 
@@ -173,7 +172,7 @@ class FeedbackCog(Cog):
                        "Would you like to give feedback? (yes/no)\n")
         self.state = FeedbackState.WAITING
 
-    @tasks.loop(seconds=60)
+    @tasks.loop(seconds=60 * 5)
     async def fetch_jobs_loop(self):
         self.fetch_jobs()
         if self.remaining:
