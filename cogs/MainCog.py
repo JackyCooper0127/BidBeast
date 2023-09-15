@@ -58,7 +58,7 @@ class MainCog(commands.Cog):
         elif action == 'status':
             await self.job_feed.status(ctx)
         else:
-            await ctx.send("Invalid action. Please use 'add', 'remove', 'list', 'start' or 'stop'")
+            await ctx.send("Invalid action. Please use 'add', 'remove', 'list', 'start', 'status' or 'stop'")
 
     @commands.command('feedback')
     async def feedback(self, ctx, action: Optional[str]):
