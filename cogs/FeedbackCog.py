@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Union, Dict, Optional
+from typing import Union, Dict
 from uuid import UUID
 
 import discord
@@ -7,33 +7,9 @@ from discord.ext import tasks
 from discord.ext.commands import Cog
 from postgrest.types import CountMethod
 
+from cogs.models import Like, Feedback
 from db import SUPABASE
 from job import Job
-
-
-class LikeState(Enum):
-    NULL = -1
-    DISLIKE = 0
-    LIKE = 1
-
-
-class FeedbackModel(object):
-    uuid: UUID
-    reasons: list[str]
-    like: LikeState
-
-    def __init__(self, uuid: UUID):
-        self.uuid = uuid
-        self.reasons = []
-        self.like = LikeState.NULL
-
-    def upload(self):
-        SUPABASE.table('potential_jobs') \
-            .update({'like': self.like.value,
-                     'reasons': self.reasons
-                     }) \
-            .eq('id', self.uuid) \
-            .execute()
 
 
 class FeedbackState(Enum):
@@ -57,7 +33,7 @@ async def _get_yes_no(message: discord.Message) -> Union[bool, None]:
 class FeedbackCog(Cog):
     user: discord.User
     # buffers to store feedback for single job
-    feedback: Union[FeedbackModel, None]
+    feedback: Union[Feedback, None]
     job: Union[Job, None]
 
     # cache of jobs that need feedback
@@ -94,17 +70,17 @@ class FeedbackCog(Cog):
     def _load_job(self):
         """ Load job from cache """
         uuid, job = self.query_cache.popitem()
-        self.feedback = FeedbackModel(uuid)
+        self.feedback = Feedback(uuid)
         self.job = job
 
     async def _extract_like(self, message):
         """ Parse like/dislike from message """
         msg = message.content.lower()
         if msg in ['yes', 'y', 'like']:
-            self.feedback.like = LikeState.LIKE
+            self.feedback.like = Like.LIKE
             return
         elif msg in ['no', 'n', 'dislike']:
-            self.feedback.like = LikeState.DISLIKE
+            self.feedback.like = Like.DISLIKE
             return
         elif msg in ['skip', 'pass', 'next']:
             return
