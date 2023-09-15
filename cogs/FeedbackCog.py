@@ -43,8 +43,8 @@ class FeedbackState(Enum):
     LIKE = 3
 
 
-async def _get_yes_no(message) -> Union[bool, None]:
-    msg = message['content'].lower()
+async def _get_yes_no(message: discord.Message) -> Union[bool, None]:
+    msg = message.content.lower()
     if msg in ['yes', 'y']:
         return True
     elif msg in ['no', 'n']:
@@ -165,12 +165,19 @@ class FeedbackCog(Cog):
 
         await ctx.send(f"\n# # #\n{self.job.title}\n# # #\n")
 
-        # TODO: split description into multiple messages
-        await ctx.send("### Description"
-                       f"\n{self.job.description}\n"
-                       "# # #"
+        # divide description into chunks of 2000 characters
+        await ctx.send("### Description")
+        for i in range(0, len(self.job.description), 2000):
+            await ctx.send(f"\n{self.job.description[i:i + 2000]}")
+
+        await ctx.send("# # #"
                        "Would you like to give feedback? (yes/no)\n")
         self.state = FeedbackState.WAITING
+
+    async def exit_conversation(self, ctx):
+        """ Exit conversation with user """
+        await ctx.send("Exiting feedback mode...")
+        self.state = FeedbackState.NOTHING
 
     @tasks.loop(seconds=60 * 5)
     async def fetch_jobs_loop(self):

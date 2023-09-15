@@ -69,8 +69,10 @@ class MainCog(commands.Cog):
         if not self._check_user(ctx):
             return
 
-        if action == 'begin':
+        if action == 'process':
             await self.feedback.begin_conversation(ctx)
+        elif action == 'exit':
+            await self.feedback.exit_conversation(ctx)
         elif action == 'start':
             await self.feedback.start_loop(ctx)
         elif action == 'fetch':
@@ -81,7 +83,7 @@ class MainCog(commands.Cog):
         elif action == 'status':
             await self.feedback.status()
         else:
-            await ctx.send("Invalid action. Please use `start`, `stop`, `fetch`, or `status`.")
+            await ctx.send("Invalid action. Please use `start`, `stop`, `fetch`, 'process', or `status`.")
 
     async def _check_user(self, ctx) -> bool:
         """Check if user is connected to the bot"""
