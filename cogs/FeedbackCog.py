@@ -1,8 +1,9 @@
-import asyncio
 from enum import Enum
 from typing import Union, Dict
 from uuid import UUID
 
+import discord
+from discord.ext import tasks
 from discord.ext.commands import Cog
 from postgrest.types import CountMethod
 
@@ -55,6 +56,7 @@ async def _get_yes_no(message) -> Union[bool, None]:
 
 
 class FeedbackCog(Cog):
+    user: discord.User
     # buffers to store feedback for single job
     feedback: Union[FeedbackModel, None]
     job: Union[Job, None]
@@ -64,23 +66,20 @@ class FeedbackCog(Cog):
 
     state: FeedbackState
 
-    def __init__(self, ctx):
-        self.ctx = ctx
+    def __init__(self, user: discord.User):
+        self.user = user
         self.feedback = None
         self.query_cache = {}
 
-        # populate `query_cache` with jobs from supabase
-        self.fetch_jobs()
-
         self.state = FeedbackState.NOTHING
 
+    @property
+    def remaining(self):
+        return len(self.query_cache)
+
     async def cog_load(self):
-        await self.ctx.send("\n# # #\n"
-                            "So you ready to provide feedback?...\n"
-                            "Use `!feedback fetch` to fetch jobs that need feedback\n"
-                            "Run `!feedback stop` if you have to leave feedback mode."
-                            "\n# # #")
-        await self._begin_conversation()
+        self.fetch_jobs_loop.start()
+        await self.user.send("Started to fetch jobs that need feedback")
 
     def fetch_jobs(self):
         """ Fetch jobs from supabase that need feedback """
@@ -111,55 +110,69 @@ class FeedbackCog(Cog):
         elif msg in ['skip', 'pass', 'next']:
             return
 
-        await self.ctx.send("Invalid response. Please respond with 'yes', 'no', or 'skip'")
+        await self.user.send("Invalid response. Please respond with 'yes', 'no', or 'skip'")
 
     async def _extract_reason(self, message):
         lines = message.content.strip().split('\n')
         if not lines:
-            await self.ctx.send("Invalid response. Please provide your comments on this job description.")
+            await self.user.send("Invalid response. Please provide your comments on this job description.")
             return
         self.feedback.reasons = lines
 
     @Cog.listener()
     async def on_message(self, message):
-        if message.author != self.ctx.author:
+        if message.author != self.user:
             return
         if self.state == FeedbackState.NOTHING:
-            if len(self.query_cache) > 0:
-                await self._begin_conversation()
+            if self.remaining:
+                await self.start()
                 self.state = FeedbackState.WAITING
             else:
                 await self._announce_finished()
         elif self.state == FeedbackState.WAITING:
             if await _get_yes_no(message):
-                await self.ctx.send("Great! Let's get started.")
-                await self.ctx.send("First, would you bid on this job? (yes/no/skip)")
+                await self.user.send("Great! Let's get started.")
+                await self.user.send("First, would you bid on this job? (yes/no/skip)")
                 self.state = FeedbackState.LIKE
         elif self.state == FeedbackState.LIKE:
             await self._extract_like(message)
-            await self.ctx.send("Next, provide a few reasons for your decision.\nSeparate each reason with a new line.")
+            await self.user.send(
+                "Next, provide a few reasons for your decision.\nSeparate each reason with a new line.")
             self.state = FeedbackState.REASON
         elif self.state == FeedbackState.REASON:
             await self._extract_reason(message)
             # send feedback to supabase
             self.feedback.upload()
-            await self.ctx.send("Feedback submitted. Thanks!\n"
-                                "Any message moves onto the next job.")
+            await self.user.send("Feedback submitted. Thanks!\n"
+                                 "Any message moves onto the next job.")
             self.state = FeedbackState.NOTHING
 
     async def _announce_finished(self):
-        await self.ctx.send("So.. it turns out there are no jobs for you to provide feedback on...\n"
-                            "...so congrats...\n"
-                            "You can exit by using `!feedback stop`")
+        await self.user.send("So.. it turns out there are no jobs for you to provide feedback on...\n"
+                             "...so congrats...\n"
+                             "You can exit by using `!feedback stop`")
 
-    async def _begin_conversation(self):
+    async def start(self):
         """ Start conversation with user """
         self._load_job()
 
-        await self.ctx.send(f"\n# # #\n{self.job.title}\n# # #\n")
+        await self.user.send("\n# # #\n"
+                             "So you ready to provide feedback?...\n"
+                             "Use `!feedback fetch` to fetch jobs that need feedback\n"
+                             "Run `!feedback stop` if you have to leave feedback mode.")
+
+        await self.user.send(f"\n# # #\n{self.job.title}\n# # #\n")
 
         # TODO: split description into multiple messages
-        await self.ctx.send("### Description"
-                            f"\n{self.job.description}\n"
-                            "# # #"
-                            "Would you like to give feedback? (yes/no)\n")
+        await self.user.send("### Description"
+                             f"\n{self.job.description}\n"
+                             "# # #"
+                             "Would you like to give feedback? (yes/no)\n")
+
+    @tasks.loop(seconds=60)
+    async def fetch_jobs_loop(self):
+        self.fetch_jobs()
+        if self.remaining:
+            await self.user.send(f"Found {self.remaining} jobs that need feedback.")
+        else:
+            await self._announce_finished()
