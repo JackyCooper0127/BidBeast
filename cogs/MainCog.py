@@ -39,9 +39,9 @@ class MainCog(commands.Cog):
 
     @commands.command('feed')
     async def feed(self, ctx, action: Optional[str], *args):
-        if self.job_feed is None:
-            await not_connected(ctx)
+        if not self._check_user(ctx):
             return
+
         if action == 'add':
             await self.job_feed.session.add_search(ctx, args[0])
         elif action == 'remove':
@@ -61,6 +61,9 @@ class MainCog(commands.Cog):
 
     @commands.command('feedback')
     async def feedback(self, ctx, action: Optional[str]):
+        if not self._check_user(ctx):
+            return
+
         if action == 'start':
             self.feedback = FeedbackCog(ctx)
             await self.bot.add_cog(self.feedback)
@@ -76,3 +79,11 @@ class MainCog(commands.Cog):
             await ctx.send("Stopped feedback")
         else:
             await ctx.send("Invalid action. Please use `start`, `stop`, or `fetch`.")
+
+    async def _check_user(self, ctx) -> bool:
+        """Check if user is connected to the bot"""
+        if self.user != ctx.author:
+            await not_connected(ctx)
+            return True
+        else:
+            return False
