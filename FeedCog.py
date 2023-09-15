@@ -1,5 +1,5 @@
 import asyncio
-from typing import Union, Iterator, ClassVar
+from typing import Union, Iterator, ClassVar, Optional
 from html import unescape
 
 import discord
@@ -8,6 +8,7 @@ from discord.ext.commands.bot import Bot
 from discord.ext import commands, tasks
 from markdownify import markdownify
 
+from cogs.FeedbackCog import FeedbackCog
 from cogs.SessionCog import SessionCog
 from functors.StoreJobFunctor import StoreJobFunctor
 from job import Job
@@ -18,12 +19,14 @@ class FeedCog(commands.Cog):
     user: Union[discord.User, None]
     store: ClassVar[StoreJobFunctor] = StoreJobFunctor()
     session: Union[SessionCog, None]
+    feedback: Union[FeedbackCog, None]
 
     def __init__(self, bot: Bot):
         print("Initializing FeedCog")
         self.bot = bot
         self.user = None
         self.session = None
+        self.feedback = None
 
     @staticmethod
     def _extract_job(entry: feedparser.FeedParserDict) -> Job:
@@ -95,6 +98,18 @@ class FeedCog(commands.Cog):
             return
         for job in self.jobs:
             await ctx.send(f'{job.link}')
+
+    @commands.command('feedback')
+    async def feedback(self, ctx, action: Optional[str]):
+        if action == 'start':
+            self.feedback = FeedbackCog(ctx)
+            await self.bot.add_cog(self.feedback)
+        elif action == 'stop':
+            self.feedback = None
+            await self.bot.remove_cog('FeedbackCog')
+            await ctx.send("Stopped feedback")
+        else:
+            await ctx.send("Invalid action. Please use 'start' or 'stop'")
 
     @tasks.loop(seconds=60)
     async def fetch_feed(self):

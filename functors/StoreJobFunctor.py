@@ -31,5 +31,6 @@ class StoreJobFunctor(Callable[[Job], None]):
         """
         cls.client.table('potential_jobs').insert({
             'title': job.title,
-            'desc': job.description
+            'desc': job.description,
+            'link': job.link
         }).execute()
