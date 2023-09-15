@@ -1,7 +1,7 @@
 import discord
 from discord.ext import commands
 
-from FeedCog import FeedCog
+from cogs.FeedCog import FeedCog
 
 
 intents = discord.Intents.default()
