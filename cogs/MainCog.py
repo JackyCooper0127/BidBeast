@@ -22,7 +22,6 @@ class MainCog(commands.Cog):
         print("Initializing MainCog")
         self.bot = bot
         self.user = None
-        self.feedback = None
 
     @commands.command('connect')
     async def connect(self, ctx):
@@ -34,9 +33,14 @@ class MainCog(commands.Cog):
 
         await ctx.send("Gotcha...")
 
+        # setup job feed
         self.job_feed = JobFeedCog(self.bot, self.user)
         await self.bot.add_cog(self.job_feed)
-        await self.job_feed.start_feed(ctx)
+
+        # setup feedback
+        self.feedback = FeedbackCog(self.user)
+        await self.bot.add_cog(self.feedback)
+        await self.feedback.start_loop(ctx)
 
     @commands.command('feed')
     async def feed(self, ctx, action: Optional[str], *args):
@@ -52,9 +56,9 @@ class MainCog(commands.Cog):
         elif action == 'list':
             await self.job_feed.list_entries(ctx)
         elif action == 'start':
-            await self.job_feed.start_feed(ctx)
+            await self.job_feed.start_feed()
         elif action == 'stop':
-            await self.job_feed.stop_feed(ctx)
+            await self.job_feed.stop_feed()
         elif action == 'status':
             await self.job_feed.status(ctx)
         else:
@@ -65,23 +69,19 @@ class MainCog(commands.Cog):
         if not self._check_user(ctx):
             return
 
-        if action == 'start':
-            self.feedback = FeedbackCog(ctx)
-            await self.bot.add_cog(self.feedback)
+        if action == 'begin':
+            await self.feedback.begin_conversation(ctx)
+        elif action == 'start':
+            await self.feedback.start_loop(ctx)
         elif action == 'fetch':
-            if self.feedback is not None:
-                self.feedback.fetch_jobs()
-                await ctx.send(f"Fetched {len(self.feedback.query_cache)} jobs that require feedback.")
-            else:
-                await ctx.send("Please start feedback mode first.")
+            self.feedback.fetch_jobs()
+            await ctx.send(f"Fetched {len(self.feedback.query_cache)} jobs that require feedback.")
         elif action == 'stop':
-            self.feedback = None
-            await self.bot.remove_cog('FeedbackCog')
-            await ctx.send("Stopped feedback")
+            await self.feedback.stop_loop(ctx)
         elif action == 'status':
             await self.feedback.status()
         else:
-            await ctx.send("Invalid action. Please use `start`, `stop`, or `fetch`.")
+            await ctx.send("Invalid action. Please use `start`, `stop`, `fetch`, or `status`.")
 
     async def _check_user(self, ctx) -> bool:
         """Check if user is connected to the bot"""

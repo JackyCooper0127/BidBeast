@@ -30,9 +30,9 @@ class FeedbackModel(object):
     def upload(self):
         SUPABASE.table('potential_jobs') \
             .update({
-                'like': self.like.value,
-                'reasons': self.reasons
-            }) \
+            'like': self.like.value,
+            'reasons': self.reasons
+        }) \
             .eq('id', self.uuid) \
             .execute()
 
@@ -124,16 +124,15 @@ class FeedbackCog(Cog):
         if message.author != self.user:
             return
         if self.state == FeedbackState.NOTHING:
-            if self.remaining:
-                await self.start()
-                self.state = FeedbackState.WAITING
-            else:
-                await self._announce_finished()
+            return
         elif self.state == FeedbackState.WAITING:
             if await _get_yes_no(message):
                 await self.user.send("Great! Let's get started.")
                 await self.user.send("First, would you bid on this job? (yes/no/skip)")
                 self.state = FeedbackState.LIKE
+            else:
+                await self.user.send("Ok, call `!feedback begin` when you're ready to provide feedback...")
+                self.state = FeedbackState.NOTHING
         elif self.state == FeedbackState.LIKE:
             await self._extract_like(message)
             await self.user.send(
@@ -152,22 +151,27 @@ class FeedbackCog(Cog):
                              "...so congrats...\n"
                              "You can exit by using `!feedback stop`")
 
-    async def start(self):
+    async def begin_conversation(self, ctx):
         """ Start conversation with user """
+        if not self.remaining:
+            await self._announce_finished()
+            return
+
         self._load_job()
 
-        await self.user.send("\n# # #\n"
-                             "So you ready to provide feedback?...\n"
-                             "Use `!feedback fetch` to fetch jobs that need feedback\n"
-                             "Run `!feedback stop` if you have to leave feedback mode.")
+        await ctx.send("\n# # #\n"
+                       "So you ready to provide feedback?...\n"
+                       "Use `!feedback fetch` to fetch jobs that need feedback\n"
+                       "Run `!feedback stop` if you have to leave feedback mode.")
 
-        await self.user.send(f"\n# # #\n{self.job.title}\n# # #\n")
+        await ctx.send(f"\n# # #\n{self.job.title}\n# # #\n")
 
         # TODO: split description into multiple messages
-        await self.user.send("### Description"
-                             f"\n{self.job.description}\n"
-                             "# # #"
-                             "Would you like to give feedback? (yes/no)\n")
+        await ctx.send("### Description"
+                       f"\n{self.job.description}\n"
+                       "# # #"
+                       "Would you like to give feedback? (yes/no)\n")
+        self.state = FeedbackState.WAITING
 
     @tasks.loop(seconds=60)
     async def fetch_jobs_loop(self):
@@ -176,6 +180,14 @@ class FeedbackCog(Cog):
             await self.user.send(f"Found {self.remaining} jobs that need feedback.")
         else:
             return
+
+    async def start_loop(self, ctx):
+        self.fetch_jobs_loop.start()
+        await ctx.send("Started loop")
+
+    async def stop_loop(self, ctx):
+        self.fetch_jobs_loop.stop()
+        await ctx.send("Stopped loop")
 
     async def status(self):
         if self.fetch_jobs_loop.is_running():
