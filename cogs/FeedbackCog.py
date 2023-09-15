@@ -171,18 +171,18 @@ class FeedbackCog(Cog):
 
         self._load_job()
 
-        await self.user.send("\n# # #\n"
+        await self.user.send("\n*# # #*\n"
                              "So you ready to provide feedback?...\n"
                              "Run `!feedback stop` if you have to leave feedback mode.")
 
-        await self.user.send(f"\n# # #\n{self.job.title}\n# # #\n")
+        await self.user.send(f"\n*# # #*\n{self.job.title}\n*# # #*\n")
 
         # divide description into chunks of 2000 characters
         await self.user.send("### Description")
         for i in range(0, len(self.job.description), 2000):
             await self.user.send(f"\n{self.job.description[i:i + 2000]}")
 
-        await self.user.send("# # #"
+        await self.user.send("\n*# # #*\n"
                              "Would you like to give feedback? (yes/no)\n")
         self.state = FeedbackState.WAITING
 
@@ -211,6 +211,6 @@ class FeedbackCog(Cog):
 
     async def status(self):
         if self.fetch_jobs_loop.is_running():
-            await self.user.send("Fetching jobs")
+            await self.user.send("> Fetching jobs")
         else:
-            await self.user.send("Not fetching jobs")
+            await self.user.send("> Not fetching jobs")
