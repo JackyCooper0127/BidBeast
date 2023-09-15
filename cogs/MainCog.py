@@ -65,20 +65,20 @@ class MainCog(commands.Cog):
 
     @commands.command('feedback')
     async def feedback(self, ctx, action: Optional[str]):
-        if not await self._check_user(ctx):
+        if await self._check_user(ctx):
             return
 
         if action == 'process':
-            await self.feedback.begin_conversation(ctx)
+            await self.feedback.begin_conversation()
         elif action == 'exit':
-            await self.feedback.exit_conversation(ctx)
+            await self.feedback.exit_conversation()
         elif action == 'start':
-            await self.feedback.start_loop(ctx)
+            await self.feedback.start_loop()
         elif action == 'fetch':
             self.feedback.fetch_jobs()
             await ctx.send(f"Fetched {len(self.feedback.query_cache)} jobs that require feedback.")
         elif action == 'stop':
-            await self.feedback.stop_loop(ctx)
+            await self.feedback.stop_loop()
         elif action == 'status':
             await self.feedback.status()
         else:

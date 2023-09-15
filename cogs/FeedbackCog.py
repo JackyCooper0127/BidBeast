@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Union, Dict
+from typing import Union, Dict, Optional
 from uuid import UUID
 
 import discord
@@ -50,7 +50,7 @@ async def _get_yes_no(message: discord.Message) -> Union[bool, None]:
     elif msg in ['no', 'n']:
         return False
     else:
-        await message['content'].send("Invalid response. Please respond with 'yes' or 'no'")
+        await message.channel.send("Invalid response. Please respond with 'yes' or 'no'")
         return
 
 
@@ -110,75 +110,86 @@ class FeedbackCog(Cog):
             return
 
         await self.user.send("Invalid response. Please respond with 'yes', 'no', or 'skip'")
+        raise ValueError("Invalid response")
 
     async def _extract_reason(self, message):
         lines = message.content.strip().split('\n')
         if not lines:
             await self.user.send("Invalid response. Please provide your comments on this job description.")
-            return
+            raise ValueError("Invalid response")
         self.feedback.reasons = lines
 
     @Cog.listener()
-    async def on_message(self, message):
+    async def on_message(self, message: discord.Message):
+        async def restart_feedback():
+            self.feedback = None
+            self.job = None
+            self.state = FeedbackState.WAITING
+            await self.on_message(message)
+
         if message.author != self.user:
             return
         if self.state == FeedbackState.NOTHING:
             return
         elif self.state == FeedbackState.WAITING:
-            if await _get_yes_no(message):
-                await self.user.send("Great! Let's get started.")
-                await self.user.send("First, would you bid on this job? (yes/no/skip)")
-                self.state = FeedbackState.LIKE
-            else:
-                await self.user.send("Ok, call `!feedback begin` when you're ready to provide feedback...")
-                self.state = FeedbackState.NOTHING
+            await self.user.send("Great! Let's get started.")
+            await self.user.send("First, would you bid on this job? (yes/no/skip)")
+            self.state = FeedbackState.LIKE
         elif self.state == FeedbackState.LIKE:
-            await self._extract_like(message)
+            try:
+                await self._extract_like(message)
+            except ValueError:
+                await restart_feedback()
+                return
             await self.user.send(
                 "Next, provide a few reasons for your decision.\nSeparate each reason with a new line.")
             self.state = FeedbackState.REASON
         elif self.state == FeedbackState.REASON:
-            await self._extract_reason(message)
+            try:
+                await self._extract_reason(message)
+            except ValueError:
+                await restart_feedback()
+                return
+
             # send feedback to supabase
             self.feedback.upload()
-            await self.user.send("Feedback submitted. Thanks!\n"
-                                 "Any message moves onto the next job.")
-            self.state = FeedbackState.WAITING
+            await self.user.send("Feedback submitted. Thanks!\n")
+
+            await self.begin_conversation()
 
     async def _announce_finished(self):
         await self.user.send("So.. it turns out there are no jobs for you to provide feedback on...\n"
-                             "...so congrats...\n"
-                             "You can exit by using `!feedback stop`")
+                             "...so congrats...\n")
+        await self.exit_conversation()
 
-    async def begin_conversation(self, ctx):
+    async def begin_conversation(self):
         """ Start conversation with user """
         if not self.remaining:
             await self._announce_finished()
             return
-        await self.stop_loop(ctx)
+        await self.stop_loop()
 
         self._load_job()
 
-        await ctx.send("\n# # #\n"
-                       "So you ready to provide feedback?...\n"
-                       "Use `!feedback fetch` to fetch jobs that need feedback\n"
-                       "Run `!feedback stop` if you have to leave feedback mode.")
+        await self.user.send("\n# # #\n"
+                             "So you ready to provide feedback?...\n"
+                             "Run `!feedback stop` if you have to leave feedback mode.")
 
-        await ctx.send(f"\n# # #\n{self.job.title}\n# # #\n")
+        await self.user.send(f"\n# # #\n{self.job.title}\n# # #\n")
 
         # divide description into chunks of 2000 characters
-        await ctx.send("### Description")
+        await self.user.send("### Description")
         for i in range(0, len(self.job.description), 2000):
-            await ctx.send(f"\n{self.job.description[i:i + 2000]}")
+            await self.user.send(f"\n{self.job.description[i:i + 2000]}")
 
-        await ctx.send("# # #"
-                       "Would you like to give feedback? (yes/no)\n")
+        await self.user.send("# # #"
+                             "Would you like to give feedback? (yes/no)\n")
         self.state = FeedbackState.WAITING
 
-    async def exit_conversation(self, ctx):
+    async def exit_conversation(self):
         """ Exit conversation with user """
-        await ctx.send("Exiting feedback mode...")
-        await self.start_loop(ctx)
+        await self.user.send("Exiting feedback mode...")
+        await self.start_loop()
         self.state = FeedbackState.NOTHING
 
     @tasks.loop(seconds=60 * 5)
@@ -190,13 +201,13 @@ class FeedbackCog(Cog):
         else:
             return
 
-    async def start_loop(self, ctx):
+    async def start_loop(self):
         self.fetch_jobs_loop.start()
-        await ctx.send("> Started feedback loop")
+        await self.user.send("> Started feedback loop")
 
-    async def stop_loop(self, ctx):
+    async def stop_loop(self):
         self.fetch_jobs_loop.stop()
-        await ctx.send("> Stopped feedback loop")
+        await self.user.send("> Stopped feedback loop")
 
     async def status(self):
         if self.fetch_jobs_loop.is_running():
