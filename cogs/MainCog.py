@@ -32,10 +32,11 @@ class MainCog(commands.Cog):
             return
         self.user = ctx.author
 
+        await ctx.send("Gotcha...")
+
         self.job_feed = JobFeedCog(self.bot, self.user)
         await self.bot.add_cog(self.job_feed)
-
-        await self.user.send("Gotcha...")
+        await self.job_feed.start_feed(ctx)
 
     @commands.command('feed')
     async def feed(self, ctx, action: Optional[str], *args):
