@@ -40,7 +40,6 @@ class MainCog(commands.Cog):
         # setup feedback
         self.feedback = FeedbackCog(self.user)
         await self.bot.add_cog(self.feedback)
-        await self.feedback.start_loop(ctx)
 
     @commands.command('feed')
     async def feed(self, ctx, action: Optional[str], *args):
