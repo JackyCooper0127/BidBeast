@@ -43,10 +43,15 @@ class SessionCog(Cog):
         self.searches = searches
         print("User data fetched")
 
-    def _add_search(self, search: str):
-        if search in self.searches:
+    def _remove_search(self, search: str):
+        self.searches.remove(search)
+        SUPABASE.table('bid_beast_users').delete().eq('id', self.user.id).eq('searches', search).execute()
+
+    async def add_search(self, ctx, link: str):
+        """Add link to local searches"""
+        if link in self.searches:
             return
-        self.searches.append(search)
+        self.searches.append(link)
 
         print('updating searches')
         SUPABASE.table('bid_beast_users') \
@@ -54,19 +59,5 @@ class SessionCog(Cog):
             .eq('id', self.user.id) \
             .execute()
 
-    def _remove_search(self, search: str):
-        self.searches.remove(search)
-        SUPABASE.table('bid_beast_users').delete().eq('id', self.user.id).eq('searches', search).execute()
-
-    @commands.command('searches')
-    async def list_searches(self, ctx):
-        """List current searches"""
-        await self.user.send(f'Current searches: {self.searches}')
-
-    @commands.command('add')
-    async def add_search_link(self, ctx, link: str):
-        """Add link to local searches"""
-        self._add_search(link)
-
-        await self.user.send(f'Added {link} to local searches')
-        await self.user.send(f'Current searches: {self.searches}')
+        await ctx.send(f'Added link to local searches')
+        await ctx.send(f'There are now {len(self.searches)} search feeds')
