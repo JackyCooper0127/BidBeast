@@ -7,9 +7,8 @@ from discord.ext import tasks
 from discord.ext.commands import Cog
 from postgrest.types import CountMethod
 
-from cogs.models import Like, Feedback
+from models import Like, Feedback, Job
 from db import SUPABASE
-from job import Job
 
 
 class FeedbackState(Enum):
