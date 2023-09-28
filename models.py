@@ -1,22 +1,38 @@
-from enum import Enum
-from typing import Union
+from enum import IntEnum
+from typing import Union, List
 from uuid import UUID
+from langchain.pydantic_v1 import BaseModel, Field
 
 from db import SUPABASE
 
 
-class Like(Enum):
+class Viability(IntEnum):
     NULL = -1
     DISLIKE = 0
     LIKE = 1
 
 
+class FeedbackModel(BaseModel):
+    pros: List[str] = Field(description="appealing aspects of this job", default=[])
+    cons: List[str] = Field(description="unappealing aspects of this job", default=[])
+    viability: Viability = Field(description="final decision to bid or not", default=Viability.NULL)
+
+    def upload(self, uuid: UUID):
+        SUPABASE.table('potential_jobs') \
+            .update({'viability': self.viability.value,
+                     'pros': self.pros,
+                     'cons': self.cons
+                     }) \
+            .eq('id', uuid) \
+            .execute()
+
+
 class Feedback(object):
     uuid: UUID
     reasons: list[str]
-    like: Like
+    like: Viability
 
-    def __init__(self, uuid: UUID, reasons: list[str] = None, like: Like = Like.NULL):
+    def __init__(self, uuid: UUID, reasons: list[str] = None, like: Viability = Viability.NULL):
         self.uuid = uuid
         self.reasons = reasons
         self.like = like

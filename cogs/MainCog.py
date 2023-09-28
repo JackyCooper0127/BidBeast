@@ -47,8 +47,8 @@ class MainCog(commands.Cog):
         self.feedback = FeedbackCog(self.user)
         await self.bot.add_cog(self.feedback)
 
-        self.explain = ExplanationCog()
-        await self.bot.add_cog(self.explain)
+        # self.explain = ExplanationCog()
+        # await self.bot.add_cog(self.explain)
 
     @commands.command('explain')
     async def do_explain(self, ctx):

@@ -7,15 +7,21 @@ from discord.ext import tasks
 from discord.ext.commands import Cog
 from postgrest.types import CountMethod
 
-from models import Like, Feedback, Job
+from models import Viability, Job, FeedbackModel
 from db import SUPABASE
+
+
+class AspectType(Enum):
+    PROS = 'PROS'
+    CONS = 'CONS'
 
 
 class FeedbackState(Enum):
     NOTHING = 0
     WAITING = 1
-    REASON = 2
-    LIKE = 3
+    LIKE = 2
+    PROS = 3
+    CONS = 4
 
 
 async def _get_yes_no(message: discord.Message) -> Union[bool, None]:
@@ -32,7 +38,8 @@ async def _get_yes_no(message: discord.Message) -> Union[bool, None]:
 class FeedbackCog(Cog):
     user: discord.User
     # buffers to store feedback for single job
-    feedback: Union[Feedback, None]
+    feedback: FeedbackModel
+    uuid: Union[UUID, None]
     job: Union[Job, None]
 
     # cache of jobs that need feedback
@@ -42,7 +49,8 @@ class FeedbackCog(Cog):
 
     def __init__(self, user: discord.User):
         self.user = user
-        self.feedback = None
+        self.feedback = FeedbackModel()
+        self.uuid = None
         self.query_cache = {}
 
         self.state = FeedbackState.NOTHING
@@ -59,7 +67,7 @@ class FeedbackCog(Cog):
         """ Fetch jobs from supabase that need feedback """
         results = SUPABASE.table("potential_jobs") \
             .select("id", "title", "desc", count=CountMethod.exact) \
-            .eq('like', -1) \
+            .eq('viability', -1) \
             .execute()
         data = results.data
         if data:
@@ -69,17 +77,18 @@ class FeedbackCog(Cog):
     def _load_job(self):
         """ Load job from cache """
         uuid, job = self.query_cache.popitem()
-        self.feedback = Feedback(uuid)
+        self.uuid = uuid
+        self.feedback = FeedbackModel()
         self.job = job
 
-    async def _extract_like(self, message):
+    async def _extract_viability(self, message):
         """ Parse like/dislike from message """
         msg = message.content.lower()
         if msg in ['yes', 'y', 'like']:
-            self.feedback.like = Like.LIKE
+            self.feedback.viability = Viability.LIKE
             return
         elif msg in ['no', 'n', 'dislike']:
-            self.feedback.like = Like.DISLIKE
+            self.feedback.viability = Viability.DISLIKE
             return
         elif msg in ['skip', 'pass', 'next']:
             return
@@ -87,16 +96,23 @@ class FeedbackCog(Cog):
         await self.user.send("Invalid response. Please respond with 'yes', 'no', or 'skip'")
         raise ValueError("Invalid response")
 
-    async def _extract_reason(self, message):
-        lines = message.content.strip().split('\n')
+    async def _extract_reason(self, message, aspect: AspectType):
+        stripped = message.content.strip()
+        if stripped == 'skip':
+            return
+        lines = stripped.split('\n')
         if not lines:
             await self.user.send("Invalid response. Please provide your comments on this job description.")
             raise ValueError("Invalid response")
-        self.feedback.reasons = lines
+        if aspect == AspectType.PROS:
+            self.feedback.pros = lines
+        if aspect == AspectType.CONS:
+            self.feedback.cons = lines
 
     @Cog.listener()
     async def on_message(self, message: discord.Message):
         async def restart_feedback():
+            print("Restarted feedback")
             self.feedback = None
             self.job = None
             self.state = FeedbackState.WAITING
@@ -112,22 +128,36 @@ class FeedbackCog(Cog):
             self.state = FeedbackState.LIKE
         elif self.state == FeedbackState.LIKE:
             try:
-                await self._extract_like(message)
+                await self._extract_viability(message)
             except ValueError:
                 await restart_feedback()
                 return
+
             await self.user.send(
-                "Next, provide a few reasons for your decision.\nSeparate each reason with a new line.")
-            self.state = FeedbackState.REASON
-        elif self.state == FeedbackState.REASON:
+                "Next, provide any appealing aspects of this decision.\nSeparate each reason with a new line.")
+
+            self.state = FeedbackState.PROS
+        elif self.state == FeedbackState.PROS:
             try:
-                await self._extract_reason(message)
+                await self._extract_reason(message, AspectType.PROS)
+            except ValueError:
+                await restart_feedback()
+                return
+
+            await self.user.send(
+                "Next, provide any *CONS* or unappealing aspects of this decision.\n"
+                "Separate each reason with a new line.")
+
+            self.state = FeedbackState.CONS
+        elif self.state == FeedbackState.CONS:
+            try:
+                await self._extract_reason(message, AspectType.CONS)
             except ValueError:
                 await restart_feedback()
                 return
 
             # send feedback to supabase
-            self.feedback.upload()
+            self.feedback.upload(self.uuid)
             await self.user.send("Feedback submitted. Thanks!\n")
 
             await self.begin_conversation()
@@ -150,10 +180,9 @@ class FeedbackCog(Cog):
                              "So you ready to provide feedback?...\n"
                              "Run `!feedback stop` if you have to leave feedback mode.")
 
-        await self.user.send(f"\n*# # #*\n{self.job.title}\n*# # #*\n")
+        await self.user.send(f"\n\n## {self.job.title}\n")
 
         # divide description into chunks of 2000 characters
-        await self.user.send("### Description")
         for i in range(0, len(self.job.description), 2000):
             await self.user.send(f"\n{self.job.description[i:i + 2000]}")
 

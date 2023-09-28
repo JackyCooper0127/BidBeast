@@ -7,14 +7,14 @@ from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 from langchain.chat_models import ChatOpenAI
 
-from models import ExplanationModel, Like
+from models import ExplanationModel, Viability
 from db import SUPABASE
 
 
-def translate_like(val: Like) -> str:
-    if val == Like.LIKE:
+def translate_like(val: Viability) -> str:
+    if val == Viability.LIKE:
         return "would like to bid"
-    elif val == Like.DISLIKE:
+    elif val == Viability.DISLIKE:
         return "would not like to bid"
     else:
         raise ValueError(f"Don't know how to translate '{repr(val)}'")
