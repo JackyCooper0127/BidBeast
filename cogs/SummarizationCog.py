@@ -1,3 +1,4 @@
+from asyncio import gather
 from typing import ClassVar, NoReturn
 from uuid import UUID
 
@@ -6,91 +7,70 @@ from discord.ext.commands import Cog
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 from langchain.chat_models import ChatOpenAI
+from sqlalchemy import null
 
-from models import ExplanationModel, Viability
 from db import SUPABASE
 
 
-def translate_like(val: Viability) -> str:
-    if val == Viability.LIKE:
-        return "would like to bid"
-    elif val == Viability.DISLIKE:
-        return "would not like to bid"
-    else:
-        raise ValueError(f"Don't know how to translate '{repr(val)}'")
-
-
-def _explain_chain() -> LLMChain:
+def _summarize_chain() -> LLMChain:
     prompt = PromptTemplate.from_template("""
     You are a consultant for a freelance contractor. You have the ability to infer the tasks and skills required for a
     given job even if the description given by the client is ambiguous or does not use the correct terminology or skips
-    over important parts.
-    
-    Title:
-    {title}
+    over important parts. You also have insight into the type of relationship a potential client will have with a
+    freelancer based on the job description they provide.
     
     Description:
+    ```
     {description}
+    ```
     
-    Using provided reasons and the given job description, state my preferences for future jobs to bid on as a
-    comma-separated list in the first person.
-    Eg: `I like jobs that work with python, I like jobs that have a definite endpoint` 
-    Eg: `I do not like jobs that are unclear, I do not like jobs that work with C#`
+    Summarize the given the job description into a brief overview of the expected outcomes,
+    the expectations of the prospective client, and skill requirements.
+    
+    The resulting summary should be 2 paragraphs or less.
     """)
 
     return LLMChain(llm=ChatOpenAI(temperature=.2, model_name="gpt-3.5-turbo"),
-                    output_key='explanation',
+                    output_key='summary',
                     prompt=prompt, )
 
 
 class SummarizationCog(Cog):
-    """ Generates the `explanation` field for `ExplanationModel` objects. """
-    chain: ClassVar[LLMChain] = _explain_chain()
-    query_cache: dict[UUID, ExplanationModel]
+    """ Generates summaries for job descriptions.
 
-    def __init__(self):
-        self.query_cache = {}
+    These summaries are used as context in the few-shot prompt when evaluating new jobs descriptions.
+    """
+    chain: ClassVar[LLMChain] = _summarize_chain()
 
     async def cog_load(self) -> None:
         # start loops
-        self.explain_loop.start()
+        self.loop.start()
 
     @tasks.loop(minutes=5)
-    async def explain_loop(self):
-        self.fetch_jobs()
-        await self.generate_explanations()
+    async def loop(self):
+        await self.process_jobs()
 
-    def fetch_jobs(self):
-        """ Retrieve jobs from db that do not have any explanation """
+    @classmethod
+    async def process_jobs(cls):
+        """ Summarize jobs in db that have not been summarized """
         results = SUPABASE.table('potential_jobs') \
-            .select('id, title, desc, link, like, reasons') \
-            .eq('explanation', '') \
-            .execute()
-        data = results.data
-        if data:
-            for job in data:
-                uuid = job['id']
+            .select('id, desc') \
+            .is_('summary', null()) \
+            .execute() \
+            .data
 
-                explanation = ExplanationModel(uuid)
-                explanation.add_job(job['title'], job['desc'], job['link'])
-                explanation.add_feedback(uuid, job['reasons'], job['like'])
+        if results:
+            ids = []
+            routines = []
 
-                self.query_cache[uuid] = explanation
+            for job in results:
+                ids.append(job['id'])
+                routines.append(cls.chain.arun({'description': job['desc']}))
 
-    async def generate_explanations(self) -> NoReturn:
-        while self.query_cache:
-            uuid, model = self.query_cache.popitem()
-            await self._explain(uuid, model)
+            summaries = await gather(*routines)
 
-    async def _explain(self, uuid: UUID, model: ExplanationModel) -> NoReturn:
-        """ Explain why a job is good or bad """
-        explanation = await self.chain.arun({'title': model.job.title,
-                                             'description': model.job.description,
-                                             'like': translate_like(model.feedback.like),
-                                             'reasons': model.feedback.reasons})
-        SUPABASE.table('potential_jobs') \
-            .update({'explanation': explanation}) \
-            .eq('id', uuid) \
-            .execute()
-
-        print(f"Generated explanation: {explanation}")
+            for uuid, summary in zip(ids, summaries):
+                SUPABASE.table('potential_jobs') \
+                    .update({'summary': summary}) \
+                    .eq('id', uuid) \
+                    .execute()

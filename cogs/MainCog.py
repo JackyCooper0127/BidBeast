@@ -47,17 +47,8 @@ class MainCog(commands.Cog):
         self.feedback = FeedbackCog(self.user)
         await self.bot.add_cog(self.feedback)
 
-        # self.explain = SummarizationCog()
-        # await self.bot.add_cog(self.explain)
-
-    @commands.command('explain')
-    async def do_explain(self, ctx):
-        if await self._check_user(ctx):
-            return
-
-        if self.explain:
-            await ctx.send("Generating explanations")
-            await self.explain.generate_explanations()
+        self.explain = SummarizationCog()
+        await self.bot.add_cog(self.explain)
 
     @commands.command('feed')
     async def feed(self, ctx, action: Optional[str], *args):
