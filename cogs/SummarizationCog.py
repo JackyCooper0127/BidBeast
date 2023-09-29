@@ -32,9 +32,6 @@ def _explain_chain() -> LLMChain:
     Description:
     {description}
     
-    The reasons I {like} this job are because:
-    {reasons}
-    
     Using provided reasons and the given job description, state my preferences for future jobs to bid on as a
     comma-separated list in the first person.
     Eg: `I like jobs that work with python, I like jobs that have a definite endpoint` 
@@ -46,7 +43,7 @@ def _explain_chain() -> LLMChain:
                     prompt=prompt, )
 
 
-class ExplanationCog(Cog):
+class SummarizationCog(Cog):
     """ Generates the `explanation` field for `ExplanationModel` objects. """
     chain: ClassVar[LLMChain] = _explain_chain()
     query_cache: dict[UUID, ExplanationModel]
