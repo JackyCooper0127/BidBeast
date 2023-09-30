@@ -10,7 +10,7 @@ from markdownify import markdownify
 
 from cogs.SessionCog import SessionCog
 from functors.StoreJobFunctor import StoreJobFunctor
-from job import Job
+from models import Job
 
 
 class JobFeedCog(Cog):

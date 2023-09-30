@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from typing import ClassVar
 from supabase import Client
-from job import Job
+from models import Job
 from db import SUPABASE
 
 
