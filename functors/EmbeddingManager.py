@@ -42,13 +42,14 @@ class EmbeddingManager:
 
         self._collection.upsert(records=embeddings)
 
-    def query(self, text: str) -> list[str]:
+    @classmethod
+    def query(cls, text: str) -> list[str]:
         """ Get a list of related UUID's for rows related to given job description. """
         # TODO: use an adapter to convert str values to UUID4
-        embedding = self._embed(text)
+        embedding = cls._embed(text)
 
         # TODO: add embeddings to vector store
-        return self._collection.query(
+        return cls._collection.query(
             data=embedding,
             limit=QUERY_MAX,
             include_value=False

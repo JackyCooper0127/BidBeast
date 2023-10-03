@@ -3,11 +3,14 @@ from copy import copy
 from typing import ClassVar
 
 from langchain.llms import OpenAI
+from langchain.output_parsers import PydanticOutputParser
 from langchain.prompts import PromptTemplate, FewShotPromptWithTemplates, BasePromptTemplate
 
 from db import SUPABASE
 from functors.EmbeddingManager import EmbeddingManager
-from models import Viability
+from models import Viability, FeedbackModel
+
+FEEDBACK_PARSER = PydanticOutputParser(pydantic_object=FeedbackModel)
 
 
 def process_past_jobs(jobs: list[dict]) -> list[dict]:
@@ -51,40 +54,46 @@ def _evaluation_prompt(examples: list[dict]) -> BasePromptTemplate:
     # Past jobs:
     """)
 
-    _suffix = PromptTemplate.from_template("""
+    _suffix = PromptTemplate(template="""
     Given the feedback from past jobs, evaluate if this next job description is suitable for the freelancer based on the
-    nature of the job and the expected outcomes. If the job is a good fit, reply with `like`, otherwise if the job
-    description is clearly not a good fit, repyl with `dislike`. If you're unsure if the freelancer would like to bid on
-    this job, reply with `unsure`. Do not assume that the freelancer will like or dislike the job if the new job
-    description is unlike the examples provided.
+    nature of the job and the expected outcomes. If the job is a good fit, `viability` should be `1`, otherwise if the
+    job description is clearly not a good fit, `viability` is `0`. If you're unsure if the freelancer would like to bid
+    on this job, `viability` is `-1`. Do not assume that the freelancer will like or dislike the job if the new job
+    description is unlike the examples provided. 
     
-    # New Job Description:\n{desc}
-    """)
+    {{format_instructions}}
+   
+    # New Job Description:\n{{desc}}
+    
+    """, partial_variables={'format_instructions': FEEDBACK_PARSER.get_format_instructions()},
+                             input_variables=['desc'], template_format='jinja2')
 
     _example_prompt = PromptTemplate.from_template("""
-    ## {title}
+    ## {{title}}
     
-    ## Summary
+    ### Summary
     
-    {summary}
+    {{summary}}
     
-    ## Appealing Aspects of Job Requirements
+    ### Appealing Aspects of Job Requirements
     
-    {pros}
+    {{pros}}
     
-    ## Unappealing Aspects of Job Requirements
+    ### Unappealing Aspects of Job Requirements
     
-    {cons}
+    {{cons}}
     
-    ## Viability
+    ### Viability
     
-    This job was {viability} by the freelancer.
-    """)
+    This job was {{viability}} by the freelancer.
+    """, template_format='jinja2')
     return FewShotPromptWithTemplates(prefix=_prefix,
                                       example_prompt=_example_prompt,
                                       examples=process_past_jobs(examples),
                                       suffix=_suffix,
-                                      input_variables=['desc'])
+                                      input_variables=['desc'],
+                                      output_parser=FEEDBACK_PARSER,
+                                      template_format='jinja2')
 
 
 class EvaluationFunctor:
@@ -103,16 +112,16 @@ class EvaluationFunctor:
         return rows.data
 
     @staticmethod
-    async def _process_desc(desc: str, examples: list[dict]) -> str:
+    async def _process_desc(desc: str, examples: list[dict]) -> FeedbackModel:
         _prompt = _evaluation_prompt(examples)
         llm = OpenAI(temperature=0.2, model_name='gpt-4')
 
         prompt = _prompt.format_prompt(desc=desc).to_string()
-
-        return await llm.apredict(prompt)
+        response = await llm.apredict(prompt)
+        return FEEDBACK_PARSER.parse(response)
 
     @classmethod
-    async def __call__(cls, desc: str) -> str:
+    async def __call__(cls, desc: str) -> FeedbackModel:
         # TODO: preprocess desc before query
         related = cls.manager.query(desc)
         examples = cls._fetch_related_rows(related)
