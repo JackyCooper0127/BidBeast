@@ -4,6 +4,7 @@ from typing import ClassVar, Union, Iterator
 
 import discord
 import feedparser
+from deprecation import deprecated
 from discord.ext import tasks
 from discord.ext.commands import Cog, Bot
 from markdownify import markdownify
@@ -51,6 +52,7 @@ class JobFeedCog(Cog):
             for entry in entries:
                 yield self._extract_job(entry)
 
+    @deprecated
     @tasks.loop(seconds=60 * 5)
     async def fetch_feed(self):
         """Fetch RSS feed and store in database"""
