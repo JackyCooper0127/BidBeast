@@ -20,39 +20,44 @@ class SearchManager(object):
         self.user = user
 
         self._add_user()
+        self._get_feed_urls()
 
     def _get_feed_urls(self):
-        """ Fetch feed urls for current user """
+        """ Populate `feed_urls` for current user """
         response = SUPABASE.table('bid_beast_users').select('searches').eq('id', self.user.id).execute()
-        searches = response.data[0]['searches']
-        if not searches:
+        feed_urls = response.data[0]['searches']
+        if not feed_urls:
             return
-        self.searches = searches
+        self.feed_urls = feed_urls
         print("User data fetched")
 
     def _add_user(self):
-        """ Add user row to user table """
+        """ Add user row to user table.
+
+        If a row already exists for current user, no change is made.
+        """
         SUPABASE.table('bid_beast_users').upsert({'id': self.user.id}).execute()
 
-    def remove_search(self, search: str):
+    def remove_url(self, search: str):
+        """ Remove a url from user's feed urls """
+        self._get_feed_urls()       # ensure `feed_urls` is updated
+        self.feed_urls.remove(search)
+        SUPABASE.table('bid_beast_users').update({'searches': self.feed_urls}).eq('id', self.user.id).execute()
 
-        self.searches.remove(search)
-        SUPABASE.table('bid_beast_users').delete().eq('id', self.user.id).eq('searches', search).execute()
-
-    def add_search(self, link: str):
-        """ Add feed link """
-        if link in self.searches:
+    def add_url(self, url: str):
+        """ Add feed url """
+        if url in self.feed_urls:
             return
-        self.searches.append(link)
+        self.feed_urls.append(url)
 
         print('updating searches')
         SUPABASE.table('bid_beast_users') \
-            .update({'searches': self.searches}) \
+            .update({'searches': self.feed_urls}) \
             .eq('id', self.user.id) \
             .execute()
 
     def __call__(self) -> Iterator[feedparser.FeedParserDict]:
         """ Fetch and parse all RSS feeds """
-        for url in self.searches:
+        for url in self.feed_urls:
             feed = feedparser.parse(url)
             yield feed['entries']
