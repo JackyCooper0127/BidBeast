@@ -39,7 +39,7 @@ class FeedbackCog(Cog):
     user: discord.User
     # buffers to store feedback for single job
     feedback: FeedbackModel
-    uuid: Union[UUID, None]
+    uuid: Union[str, None]
     job: Union[Job, None]
 
     # cache of jobs that need feedback
@@ -111,15 +111,15 @@ class FeedbackCog(Cog):
         if aspect == AspectType.CONS:
             self.feedback.cons = lines
 
+    async def _restart_buffer(self):
+        print("Bad response. Restarted feedback")
+        self.feedback = FeedbackModel()
+        self.job = None
+        self.uuid = None
+        self.state = FeedbackState.WAITING
+
     @Cog.listener()
     async def on_message(self, message: discord.Message):
-        async def restart_feedback():
-            print("Restarted feedback")
-            self.feedback = None
-            self.job = None
-            self.state = FeedbackState.WAITING
-            await self.on_message(message)
-
         if message.author != self.user:
             return
         if self.state == FeedbackState.NOTHING:
@@ -129,40 +129,48 @@ class FeedbackCog(Cog):
             await self.user.send("First, would you bid on this job? (yes/no/skip)")
             self.state = FeedbackState.LIKE
         elif self.state == FeedbackState.LIKE:
-            try:
-                await self._extract_viability(message)
-            except ValueError:
-                await restart_feedback()
-                return
-
-            await self.user.send(
-                "Next, provide any appealing aspects of this decision.\nSeparate each reason with a new line.")
-
-            self.state = FeedbackState.PROS
+            await self._handle_viability(message)
         elif self.state == FeedbackState.PROS:
-            try:
-                await self._extract_reason(message, AspectType.PROS)
-            except ValueError:
-                await restart_feedback()
-                return
-
-            await self.user.send(
-                "Next, provide any *CONS* or unappealing aspects of this decision.\n"
-                "Separate each reason with a new line.")
-
-            self.state = FeedbackState.CONS
+            await self._handle_pros(message)
         elif self.state == FeedbackState.CONS:
-            try:
-                await self._extract_reason(message, AspectType.CONS)
-            except ValueError:
-                await restart_feedback()
-                return
-
-            # send feedback to supabase
-            self.feedback.upload(self.uuid)
-            await self.user.send("Feedback submitted. Thanks!\n")
-
+            await self._handle_cons(message)
             await self.begin_conversation()
+
+    async def _handle_viability(self, message: discord.Message):
+        try:
+            await self._extract_viability(message)
+        except ValueError:
+            await self._restart_buffer()
+            return
+
+        await self.user.send(
+            "Next, provide any appealing aspects of this decision.\nSeparate each reason with a new line.")
+
+        self.state = FeedbackState.PROS
+
+    async def _handle_pros(self, message: discord.Message):
+        try:
+            await self._extract_reason(message, AspectType.PROS)
+        except ValueError:
+            await self._restart_buffer()
+            return
+
+        await self.user.send(
+            "Next, provide any *CONS* or unappealing aspects of this decision.\n"
+            "Separate each reason with a new line.")
+
+        self.state = FeedbackState.CONS
+
+    async def _handle_cons(self, message: discord.Message):
+        try:
+            await self._extract_reason(message, AspectType.CONS)
+        except ValueError:
+            await self._restart_buffer()
+            return
+
+        # send feedback to supabase
+        self.feedback.upload(self.uuid)
+        await self.user.send("Feedback submitted. Thanks!\n")
 
     async def _announce_finished(self):
         await self.user.send("So.. it turns out there are no jobs for you to provide feedback on...\n"
