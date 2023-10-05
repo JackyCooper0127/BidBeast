@@ -72,7 +72,9 @@ class FeedbackCog(Cog):
         data = results.data
         if data:
             for job in data:
-                self.query_cache[job['id']] = Job(job['title'], job['desc'], '')
+                uuid = job['id']
+                if uuid != self.uuid:
+                    self.query_cache[uuid] = Job(job['title'], job['desc'], '')
 
     def _load_job(self):
         """ Load job from cache """
