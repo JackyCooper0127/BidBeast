@@ -124,10 +124,6 @@ class FeedbackCog(Cog):
             return
         if self.state == FeedbackState.NOTHING:
             return
-        elif self.state == FeedbackState.WAITING:
-            await self.user.send("Great! Let's get started.")
-            await self.user.send("First, would you bid on this job? (yes/no/skip)")
-            self.state = FeedbackState.LIKE
         elif self.state == FeedbackState.LIKE:
             await self._handle_viability(message)
         elif self.state == FeedbackState.PROS:
@@ -196,9 +192,9 @@ class FeedbackCog(Cog):
         for i in range(0, len(self.job.description), 2000):
             await self.user.send(f"\n{self.job.description[i:i + 2000]}")
 
-        await self.user.send("\n*# # #*\n"
-                             "Would you like to give feedback? (yes/no)\n")
-        self.state = FeedbackState.WAITING
+        await self.user.send("Great! Let's get started.")
+        await self.user.send("First, would you bid on this job? (yes/no/skip)")
+        self.state = FeedbackState.LIKE
 
     async def exit_conversation(self):
         """ Exit conversation with user """
