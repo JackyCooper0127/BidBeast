@@ -56,8 +56,11 @@ class SearchManager(object):
             .eq('id', self.user.id) \
             .execute()
 
-    def __call__(self) -> Iterator[feedparser.FeedParserDict]:
+    def __call__(self) -> list[dict]:
         """ Fetch and parse all RSS feeds """
+        entries: list[dict] = []
         for url in self.feed_urls:
             feed = feedparser.parse(url)
-            yield feed['entries']
+            for entry in feed['entries']:
+                entries.append(entry)
+        return entries
