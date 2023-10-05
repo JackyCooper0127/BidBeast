@@ -40,7 +40,7 @@ class MainCog(commands.Cog):
         await ctx.send("Gotcha...")
 
         # setup job feed
-        self.job_feed = JobFeedCog(self.bot, self.user)
+        self.job_feed = JobFeedCog(self.user)
         await self.bot.add_cog(self.job_feed)
 
         # setup feedback
@@ -56,13 +56,11 @@ class MainCog(commands.Cog):
             return
 
         if action == 'add':
-            await self.job_feed.session.add_search(ctx, args[0])
+            await self.job_feed.searches.add_url(args[0])
         elif action == 'remove':
             await ctx.send(f"This function has not been implemented yet")
         elif action == 'searches':
-            await ctx.send(f"Current searches\n: {self.job_feed.session.searches}")
-        elif action == 'list':
-            await self.job_feed.list_entries(ctx)
+            await ctx.send(f"Current searches\n: {self.job_feed.searches.feed_urls}")
         elif action == 'enable':
             await self.job_feed.enable_loop()
         elif action == 'disable':
