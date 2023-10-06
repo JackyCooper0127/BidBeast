@@ -72,7 +72,9 @@ class FeedbackCog(Cog):
         data = results.data
         if data:
             for job in data:
-                self.query_cache[job['id']] = Job(job['title'], job['desc'], '')
+                uuid = job['id']
+                if uuid != self.uuid:
+                    self.query_cache[uuid] = Job(job['title'], job['desc'], '')
 
     def _load_job(self):
         """ Load job from cache """
@@ -90,10 +92,8 @@ class FeedbackCog(Cog):
         elif msg in ['no', 'n', 'dislike']:
             self.feedback.viability = Viability.DISLIKE
             return
-        elif msg in ['skip', 'pass', 'next']:
-            return
 
-        await self.user.send("Invalid response. Please respond with 'yes', 'no', or 'skip'")
+        await self.user.send("Invalid response. Please respond with 'yes' or 'no'")
         raise ValueError("Invalid response")
 
     async def _extract_reason(self, message, aspect: AspectType):
@@ -109,58 +109,63 @@ class FeedbackCog(Cog):
         if aspect == AspectType.CONS:
             self.feedback.cons = lines
 
+    async def _clear_buffer(self):
+        print("Bad response. Restarted feedback")
+        self.feedback = FeedbackModel()
+        self.job = None
+        self.uuid = None
+        self.state = FeedbackState.WAITING
+
     @Cog.listener()
     async def on_message(self, message: discord.Message):
-        async def restart_feedback():
-            print("Restarted feedback")
-            self.feedback = None
-            self.job = None
-            self.state = FeedbackState.WAITING
-            await self.on_message(message)
-
         if message.author != self.user:
             return
         if self.state == FeedbackState.NOTHING:
             return
-        elif self.state == FeedbackState.WAITING:
-            await self.user.send("Great! Let's get started.")
-            await self.user.send("First, would you bid on this job? (yes/no/skip)")
-            self.state = FeedbackState.LIKE
         elif self.state == FeedbackState.LIKE:
-            try:
-                await self._extract_viability(message)
-            except ValueError:
-                await restart_feedback()
-                return
-
-            await self.user.send(
-                "Next, provide any appealing aspects of this decision.\nSeparate each reason with a new line.")
-
-            self.state = FeedbackState.PROS
+            await self._handle_viability(message)
         elif self.state == FeedbackState.PROS:
-            try:
-                await self._extract_reason(message, AspectType.PROS)
-            except ValueError:
-                await restart_feedback()
-                return
-
-            await self.user.send(
-                "Next, provide any *CONS* or unappealing aspects of this decision.\n"
-                "Separate each reason with a new line.")
-
-            self.state = FeedbackState.CONS
+            await self._handle_pros(message)
         elif self.state == FeedbackState.CONS:
-            try:
-                await self._extract_reason(message, AspectType.CONS)
-            except ValueError:
-                await restart_feedback()
-                return
-
-            # send feedback to supabase
-            self.feedback.upload(self.uuid)
-            await self.user.send("Feedback submitted. Thanks!\n")
-
+            await self._handle_cons(message)
             await self.begin_conversation()
+
+    async def _handle_viability(self, message: discord.Message):
+        try:
+            await self._extract_viability(message)
+        except ValueError:
+            await self._clear_buffer()
+            return
+
+        await self.user.send("## Pros\n"
+                             "What do you like about this job?\n"
+                             "Separate each comment with a new line.")
+
+        self.state = FeedbackState.PROS
+
+    async def _handle_pros(self, message: discord.Message):
+        try:
+            await self._extract_reason(message, AspectType.PROS)
+        except ValueError:
+            await self._clear_buffer()
+            return
+
+        await self.user.send("## Cons\n"
+                             "What do you *not* like about this job\n"
+                             "Separate each comment with a new line.")
+
+        self.state = FeedbackState.CONS
+
+    async def _handle_cons(self, message: discord.Message):
+        try:
+            await self._extract_reason(message, AspectType.CONS)
+        except ValueError:
+            await self._clear_buffer()
+            return
+
+        # send feedback to supabase
+        self.feedback.upload(self.uuid)
+        await self.user.send("Feedback submitted. Thanks!\n")
 
     async def _announce_finished(self):
         await self.user.send("So.. it turns out there are no jobs for you to provide feedback on...\n"
@@ -172,23 +177,23 @@ class FeedbackCog(Cog):
         if not self.remaining:
             await self._announce_finished()
             return
+
         await self.disable_loop()
 
         self._load_job()
 
-        await self.user.send("\n*# # #*\n"
-                             "So you ready to provide feedback?...\n"
-                             "Run `!feedback stop` if you have to leave feedback mode.")
-
-        await self.user.send(f"\n\n## {self.job.title}\n")
+        await self.user.send("So you ready to provide feedback?...\n"
+                             "Run `!feedback stop` if you have to leave feedback mode."
+                             f"\n\n# {self.job.title}\n")
 
         # divide description into chunks of 2000 characters
         for i in range(0, len(self.job.description), 2000):
             await self.user.send(f"\n{self.job.description[i:i + 2000]}")
 
-        await self.user.send("\n*# # #*\n"
-                             "Would you like to give feedback? (yes/no)\n")
-        self.state = FeedbackState.WAITING
+        await self.user.send("Great! Let's get started...\n"
+                             "## Viability\n"
+                             "Would you bid on this job? (yes/no)")
+        self.state = FeedbackState.LIKE
 
     async def exit_conversation(self):
         """ Exit conversation with user """
