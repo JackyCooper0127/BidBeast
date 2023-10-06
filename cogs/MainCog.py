@@ -6,7 +6,7 @@ from discord.ext import commands
 
 from cogs.JobFeedCog import JobFeedCog
 from cogs.FeedbackCog import FeedbackCog
-from cogs.ExplanationCog import ExplanationCog
+from cogs.SummarizationCog import SummarizationCog
 
 
 async def not_connected(ctx):
@@ -18,7 +18,7 @@ class MainCog(commands.Cog):
     user: Union[discord.User, None]
     job_feed: Union[JobFeedCog, None]
     feedback: Union[FeedbackCog, None]
-    explain: Union[ExplanationCog, None]
+    explain: Union[SummarizationCog, None]
 
     def __init__(self, bot: Bot):
         print("Initializing MainCog")
@@ -40,24 +40,15 @@ class MainCog(commands.Cog):
         await ctx.send("Gotcha...")
 
         # setup job feed
-        self.job_feed = JobFeedCog(self.bot, self.user)
+        self.job_feed = JobFeedCog(self.user)
         await self.bot.add_cog(self.job_feed)
 
         # setup feedback
         self.feedback = FeedbackCog(self.user)
         await self.bot.add_cog(self.feedback)
 
-        # self.explain = ExplanationCog()
-        # await self.bot.add_cog(self.explain)
-
-    @commands.command('explain')
-    async def do_explain(self, ctx):
-        if await self._check_user(ctx):
-            return
-
-        if self.explain:
-            await ctx.send("Generating explanations")
-            await self.explain.generate_explanations()
+        self.explain = SummarizationCog()
+        await self.bot.add_cog(self.explain)
 
     @commands.command('feed')
     async def feed(self, ctx, action: Optional[str], *args):
@@ -65,13 +56,11 @@ class MainCog(commands.Cog):
             return
 
         if action == 'add':
-            await self.job_feed.session.add_search(ctx, args[0])
+            await self.job_feed.searches.add_url(args[0])
         elif action == 'remove':
             await ctx.send(f"This function has not been implemented yet")
         elif action == 'searches':
-            await ctx.send(f"Current searches\n: {self.job_feed.session.searches}")
-        elif action == 'list':
-            await self.job_feed.list_entries(ctx)
+            await ctx.send(f"Current searches\n: {self.job_feed.searches.feed_urls}")
         elif action == 'enable':
             await self.job_feed.enable_loop()
         elif action == 'disable':

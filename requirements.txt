@@ -6,3 +6,5 @@ postgrest~=0.10.8
 langchain==0.0.304
 openai
 vecs
+SQLAlchemy~=2.0.20
+deprecation~=2.1.0

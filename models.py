@@ -57,6 +57,9 @@ class Job(object):
         self.description = description
         self.link = link
 
+    def __repr__(self):
+        return self.title
+
 
 class ExplanationModel(object):
     """
