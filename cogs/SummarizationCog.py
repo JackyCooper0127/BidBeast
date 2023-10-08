@@ -60,17 +60,21 @@ class SummarizationCog(Cog):
             .data
 
         if results:
-            ids = []
-            routines = []
+            await cls._process(results)
 
-            for job in results:
-                ids.append(job['id'])
-                routines.append(cls.chain.arun({'description': job['desc']}))
+    @classmethod
+    async def _process(cls, descriptions: list[dict]):
+        ids = []
+        routines = []
 
-            summaries = await gather(*routines)
+        for job in descriptions:
+            ids.append(job['id'])
+            routines.append(cls.chain.arun({'description': job['desc']}))
 
-            for uuid, summary in zip(ids, summaries):
-                SUPABASE.table('potential_jobs') \
-                    .update({'summary': summary}) \
-                    .eq('id', uuid) \
-                    .execute()
+        summaries = await gather(*routines)
+
+        for uuid, summary in zip(ids, summaries):
+            SUPABASE.table('potential_jobs') \
+                .update({'summary': summary}) \
+                .eq('id', uuid) \
+                .execute()
