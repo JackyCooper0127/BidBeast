@@ -6,7 +6,6 @@ from discord.ext import commands
 
 from cogs.JobFeedCog import JobFeedCog
 from cogs.FeedbackCog import FeedbackCog
-from cogs.SummarizationCog import SummarizationCog
 
 
 async def not_connected(ctx):
@@ -18,7 +17,6 @@ class MainCog(commands.Cog):
     user: Union[discord.User, None]
     job_feed: Union[JobFeedCog, None]
     feedback: Union[FeedbackCog, None]
-    explain: Union[SummarizationCog, None]
 
     def __init__(self, bot: Bot):
         print("Initializing MainCog")
@@ -27,7 +25,6 @@ class MainCog(commands.Cog):
 
         self.job_feed = None
         self.feedback = None
-        self.explain = None
 
     @commands.command('connect')
     async def connect(self, ctx):
@@ -46,9 +43,6 @@ class MainCog(commands.Cog):
         # setup feedback
         self.feedback = FeedbackCog(self.user)
         await self.bot.add_cog(self.feedback)
-
-        self.explain = SummarizationCog()
-        await self.bot.add_cog(self.explain)
 
     @commands.command('feed')
     async def feed(self, ctx, action: Optional[str], *args):

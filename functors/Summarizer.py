@@ -1,15 +1,11 @@
 from asyncio import gather
-from typing import ClassVar, NoReturn
-from uuid import UUID
-
-from discord.ext import tasks
-from discord.ext.commands import Cog
+from typing import ClassVar
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 from langchain.chat_models import ChatOpenAI
-from sqlalchemy import null
 
 from db import SUPABASE
+from models import Job
 
 
 def _summarize_chain() -> LLMChain:
@@ -35,46 +31,24 @@ def _summarize_chain() -> LLMChain:
                     prompt=prompt, )
 
 
-class SummarizationCog(Cog):
+class Summarizer:
     """ Generates summaries for job descriptions.
 
     These summaries are used as context in the few-shot prompt when evaluating new jobs descriptions.
     """
     chain: ClassVar[LLMChain] = _summarize_chain()
 
-    async def cog_load(self) -> None:
-        # start loops
-        self.loop.start()
-
-    @tasks.loop(minutes=5)
-    async def loop(self):
-        await self.process_jobs()
-
     @classmethod
-    async def process_jobs(cls):
-        """ Summarize jobs in db that have not been summarized """
-        results = SUPABASE.table('potential_jobs') \
-            .select('id, desc') \
-            .is_('summary', null()) \
-            .execute() \
-            .data
-
-        if results:
-            await cls._process(results)
-
-    @classmethod
-    async def _process(cls, descriptions: list[dict]):
-        ids = []
+    async def _process(cls, jobs: list[Job]):
         routines = []
 
-        for job in descriptions:
-            ids.append(job['id'])
-            routines.append(cls.chain.arun({'description': job['desc']}))
+        for job in jobs:
+            routines.append(cls.chain.arun({'description': job.description}))
 
         summaries = await gather(*routines)
+        for job, summary in zip(jobs, summaries):
+            job.summary = job
 
-        for uuid, summary in zip(ids, summaries):
-            SUPABASE.table('potential_jobs') \
-                .update({'summary': summary}) \
-                .eq('id', uuid) \
-                .execute()
+    @classmethod
+    async def __call__(cls, jobs: list[Job]):
+        await cls._process(jobs)
