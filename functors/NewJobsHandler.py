@@ -1,8 +1,10 @@
+import asyncio
 from typing import ClassVar
 
 from postgrest import SyncRequestBuilder
 
 from db import SUPABASE
+from functors.EvaluationFunctor import EvaluationFunctor
 from functors.Summarizer import Summarizer
 from models import Job
 
@@ -14,6 +16,7 @@ class NewJobsHandler(object):
     """
     _table: ClassVar[SyncRequestBuilder] = SUPABASE.table('potential_jobs')
     _summarizer: ClassVar[Summarizer] = Summarizer()
+    _evaluator: ClassVar[EvaluationFunctor] = EvaluationFunctor()
 
     @classmethod
     def _store_job(cls, jobs: list[Job]):
@@ -26,13 +29,40 @@ class NewJobsHandler(object):
                 'link': i.link,
                 'summary': i.summary
             }
+            if i.feedback:
+                fb = i.feedback
+                row['viability'] = fb.viability.value
+                row['pros'] = fb.pros
+                row['cons'] = fb.cons
             formatted.append(row)
         cls._table.insert(formatted).execute()
 
     @classmethod
-    async def __call__(cls, jobs: list[Job]):
-        # generate description summary
-        await cls._summarizer(jobs)
+    async def _evaluate(cls, jobs: list[Job]):
+        """ Generate feedback for given list of jobs.
 
-        cls._store_job(jobs)
-        # TODO: generate embeddings
+        `FeedbackModel` is returned by `EvaluationFunctor.__call__()` then added to `Job`.
+        """
+        print(f"Evaluating {len(jobs)} new jobs...")
+        coroutines = [cls._evaluator(i.description) for i in jobs]
+        results = await asyncio.gather(*coroutines)
+        for job, fb in zip(jobs, results):
+            job.feedback = fb
+        print("Finished evaluating jobs")
+
+    @classmethod
+    async def __call__(cls, jobs: list[Job]):
+        if jobs:
+            print(f"Found {len(jobs)} new jobs")
+            coroutines = [
+                # TODO: generate embeddings
+                cls._summarizer(jobs),
+                cls._evaluate(jobs)
+            ]
+            # TODO: notify of valid jobs
+
+            await asyncio.gather(*coroutines)
+
+            cls._store_job(jobs)
+        else:
+            print("No new jobs...")

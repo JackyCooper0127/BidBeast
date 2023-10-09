@@ -23,7 +23,8 @@ class FeedbackModel(BaseModel):
         SUPABASE.table('potential_jobs') \
             .update({'viability': self.viability.value,
                      'pros': self.pros,
-                     'cons': self.cons
+                     'cons': self.cons,
+                     'reviewed': True
                      }) \
             .eq('id', uuid) \
             .execute()
@@ -35,6 +36,7 @@ class Job(object):
     description: str
     link: str
     summary: str = ''
+    feedback: Union[FeedbackModel, None] = None
 
     def __init__(self, title: str, description: str, link: str):
         self.title = title
