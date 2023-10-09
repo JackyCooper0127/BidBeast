@@ -32,7 +32,7 @@ class JobFeedCog(Cog):
 
         raw_feed = self.searches()
         new_jobs = self.parser(raw_feed)
-        self.handler(new_jobs)
+        await self.handler(new_jobs)
 
     async def enable_loop(self):
         """Start the fetching RSS feed"""
