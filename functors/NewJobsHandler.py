@@ -4,6 +4,7 @@ from typing import ClassVar
 from postgrest import SyncRequestBuilder
 
 from db import SUPABASE
+from functors.EmbeddingManager import EmbeddingManager
 from functors.EvaluationFunctor import EvaluationFunctor
 from functors.Summarizer import Summarizer
 from models import Job
@@ -17,6 +18,7 @@ class NewJobsHandler(object):
     _table: ClassVar[SyncRequestBuilder] = SUPABASE.table('potential_jobs')
     _summarizer: ClassVar[Summarizer] = Summarizer()
     _evaluator: ClassVar[EvaluationFunctor] = EvaluationFunctor()
+    _manager: ClassVar[EmbeddingManager] = EmbeddingManager()
 
     @classmethod
     def _store_job(cls, jobs: list[Job]):
@@ -24,6 +26,7 @@ class NewJobsHandler(object):
         formatted = []
         for i in jobs:
             row = {
+                'id': i.id,
                 'title': i.title,
                 'desc': i.description,
                 'link': i.link,
@@ -55,9 +58,9 @@ class NewJobsHandler(object):
         if jobs:
             print(f"Found {len(jobs)} new jobs")
             coroutines = [
-                # TODO: generate embeddings
                 cls._summarizer(jobs),
-                cls._evaluate(jobs)
+                cls._evaluate(jobs),
+                cls._manager(jobs)          # generate embeddings
             ]
             # TODO: notify of valid jobs
 

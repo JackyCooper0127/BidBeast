@@ -3,11 +3,11 @@ from typing import ClassVar
 
 from openai import Embedding
 import vecs
-from vecs.collection import Numeric
 
+from models import Job
 
 # number of related job descriptions to return
-QUERY_MAX: int = 5
+QUERY_MAX: int = 7
 
 
 def _setup_vector_store() -> vecs.Collection:
@@ -24,7 +24,8 @@ def _setup_vector_store() -> vecs.Collection:
 class EmbeddingManager:
     _collection: ClassVar[vecs.Collection] = _setup_vector_store()
 
-    def generate_embeddings(self, data: list[dict]):
+    @classmethod
+    def generate_embeddings(cls, data: list[dict]):
         """ Generate embeddings for a batch of job descriptions.
 
         This should only need to be executed once to bootstrap the vector store.
@@ -32,15 +33,12 @@ class EmbeddingManager:
         embeddings = []
 
         for row in data:
-            for key in ('id', 'desc'):
-                assert key in row.keys()
-
-            embed = self._embed(row['desc'])
+            embed = cls._embed(row['desc'])
             embeddings.append((row['id'],
                                embed,
                                {}))
 
-        self._collection.upsert(records=embeddings)
+        cls._collection.upsert(records=embeddings)
 
     @classmethod
     def query(cls, text: str) -> list[str]:
@@ -62,4 +60,10 @@ class EmbeddingManager:
             input=[text]
         )
         return response["data"][0]["embedding"]
+
+    @classmethod
+    async def __call__(cls, jobs: list[Job]):
+        data = [{'id': job.id, 'desc': job.description} for job in jobs]
+        cls.generate_embeddings(data)
+
 
