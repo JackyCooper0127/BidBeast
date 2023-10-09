@@ -34,6 +34,7 @@ class Job(object):
     title: str
     description: str
     link: str
+    summary: str = ''
 
     def __init__(self, title: str, description: str, link: str):
         self.title = title
