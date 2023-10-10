@@ -47,8 +47,10 @@ class Summarizer:
 
         summaries = await gather(*routines)
         for job, summary in zip(jobs, summaries):
-            job.summary = job
+            job.summary = summary
 
     @classmethod
     async def __call__(cls, jobs: list[Job]):
+        print(f"Generating summaries for {len(jobs)} jobs...")
         await cls._process(jobs)
+        print("Summaries complete!")
