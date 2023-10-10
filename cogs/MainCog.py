@@ -70,7 +70,7 @@ class MainCog(commands.Cog):
             return
 
         if action == 'process':
-            await self.feedback.begin_conversation()
+            await self.feedback.begin()
         elif action == 'exit':
             await self.feedback.exit_conversation()
         elif action == 'enable':
