@@ -24,10 +24,14 @@ def process_past_jobs(jobs: list[dict]) -> list[dict]:
         elif viability == Viability.LIKE:
             _job['viability'] = 'bid'
         elif viability == Viability.NULL:
-            warnings.warn("Encountered unprocessed description. Skipping.")
+            warnings.warn("Encountered ambiguous viability. Skipping...")
             continue
         else:
             raise ValueError("Invalid value for 'viability'")
+
+        if not job['reviewed']:
+            warnings.warn("Encountered unreviewed row. Skipping...")
+            continue
 
         # expand pros/cons to text list
         for kind in ('pros', 'cons'):
@@ -107,7 +111,7 @@ class EvaluationFunctor:
     @staticmethod
     def _fetch_related_rows(related_ids: list[str]):
         rows = SUPABASE.table('potential_jobs') \
-            .select('summary, title, pros, cons, viability') \
+            .select('summary, title, pros, cons, viability, reviewed') \
             .in_('id', related_ids).execute()
         return rows.data
 
