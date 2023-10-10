@@ -44,4 +44,5 @@ class FeedParser(object):
         for job in jobs:
             if job.title not in duplicates_titles:
                 incoming.append(job)
+        print(f"Parsed {len(incoming)} jobs...")
         return incoming
