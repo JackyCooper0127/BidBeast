@@ -179,6 +179,14 @@ class FeedbackCog(Cog):
         self.feedback = FeedbackModel()
         self.job = job
 
+    def _unload_job(self):
+        """ Restore buffer to cache.
+
+        This is for when feedback mode is exited prematurely.
+        """
+        if self.job and self.uuid:
+            self.query_cache[self.uuid] = self.job
+
     def _clear_buffer(self):
         print("Bad response. Restarted feedback")
         self.feedback = FeedbackModel()
@@ -242,6 +250,7 @@ class FeedbackCog(Cog):
 
     async def exit_conversation(self):
         """ Exit conversation with user """
+        self._unload_job()
         await self.user.send("Exiting feedback mode...")
         await self.enable_loop()
 
