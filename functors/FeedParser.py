@@ -6,6 +6,7 @@ from postgrest import SyncRequestBuilder
 from postgrest.types import CountMethod
 
 from db import SUPABASE
+from helpers import retry_on_error
 from models import Job
 
 
@@ -27,6 +28,7 @@ class FeedParser(object):
     _table: ClassVar[SyncRequestBuilder] = SUPABASE.table('potential_jobs')
 
     @classmethod
+    @retry_on_error()
     def __call__(cls, entries: list[dict]) -> list[Job]:
         """ Accept new `Job` objects from the raw RSS feed """
         jobs = [_extract_job(i) for i in entries]
@@ -42,4 +44,5 @@ class FeedParser(object):
         for job in jobs:
             if job.title not in duplicates_titles:
                 incoming.append(job)
+        print(f"Parsed {len(incoming)} jobs...")
         return incoming

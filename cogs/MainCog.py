@@ -64,13 +64,13 @@ class MainCog(commands.Cog):
         else:
             await ctx.send("Invalid action. Please use `add`, `remove`, `list`, `enable`, `disable` or `status`")
 
-    @commands.command('feedback')
+    @commands.command('fb')
     async def feedback(self, ctx, action: Optional[str]):
         if await self._check_user(ctx):
             return
 
         if action == 'process':
-            await self.feedback.begin_conversation()
+            await self.feedback.begin()
         elif action == 'exit':
             await self.feedback.exit_conversation()
         elif action == 'enable':

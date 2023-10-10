@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Union, Dict
 from uuid import UUID
@@ -7,6 +8,7 @@ from discord.ext import tasks
 from discord.ext.commands import Cog
 from postgrest.types import CountMethod
 
+from helpers import retry_on_error
 from models import Viability, Job, FeedbackModel
 from db import SUPABASE
 
@@ -22,6 +24,101 @@ class FeedbackState(Enum):
     LIKE = 2
     PROS = 3
     CONS = 4
+
+    def next(self) -> 'FeedbackState':
+        if self == FeedbackState.NOTHING:
+            return self.WAITING
+        elif self == FeedbackState.WAITING:
+            return self.PROS
+        elif self == FeedbackState.PROS:
+            return self.CONS
+        else:
+            return self.NOTHING
+
+
+class FeedbackInputHandler(ABC):
+    """ Abstract strategy for handling input """
+    user: discord.User
+    feedback: FeedbackModel
+
+    def __init__(self, user: discord.User, feedback: FeedbackModel):
+        self.user = user
+        self.feedback = feedback
+
+    @abstractmethod
+    async def prompt_text(self, job: Job):
+        pass
+
+    @abstractmethod
+    async def parse_msg(self, msg):
+        pass
+
+    @abstractmethod
+    def next(self) -> Union['FeedbackInputHandler', None]:
+        pass
+
+
+class ViabilityHandler(FeedbackInputHandler):
+
+    async def prompt_text(self, job: Job):
+        msg = ("## Viability\n"
+               "Would you bid on this job? (yes/no)")
+        return await self.user.send(msg)
+
+    async def parse_msg(self, message):
+        msg = message.content.lower()
+        if msg in ['yes', 'y', 'like']:
+            self.feedback.viability = Viability.LIKE
+        elif msg in ['no', 'n', 'dislike']:
+            self.feedback.viability = Viability.DISLIKE
+        else:
+            await self.user.send("Invalid response. Please respond with 'yes' or 'no'")
+            raise ValueError("Invalid response")
+
+    def next(self) -> 'FeedbackInputHandler':
+        return ProsHandler(self.user, self.feedback)
+
+
+class ProsHandler(FeedbackInputHandler):
+    async def prompt_text(self, job: Job):
+        msg = ("## Pros\n"
+               "What do you like about this job?\n"
+               "Separate each comment with a new line.")
+        await self.user.send(msg)
+
+    async def parse_msg(self, message):
+        stripped = message.content.strip()
+        if stripped == 'skip':
+            return
+        lines = stripped.split('\n')
+        if not lines:
+            await self.user.send("Invalid response. Please provide positive aspects about this job description.")
+            raise ValueError("Invalid response")
+        self.feedback.pros = lines
+
+    def next(self) -> 'FeedbackInputHandler':
+        return ConsHandler(self.user, self.feedback)
+
+
+class ConsHandler(FeedbackInputHandler):
+    async def prompt_text(self, job: Job):
+        msg = ("## Cons\n"
+               "What do you *not* like about this job?\n"
+               "Separate each comment with a new line.")
+        await self.user.send(msg)
+
+    async def parse_msg(self, message):
+        stripped = message.content.strip()
+        if stripped == 'skip':
+            return
+        lines = stripped.split('\n')
+        if not lines:
+            await self.user.send("Invalid response. Please provide the negative aspects about this job description.")
+            raise ValueError("Invalid response")
+        self.feedback.cons = lines
+
+    def next(self) -> None:
+        return None
 
 
 async def _get_yes_no(message: discord.Message) -> Union[bool, None]:
@@ -45,15 +142,13 @@ class FeedbackCog(Cog):
     # cache of jobs that need feedback
     query_cache: Dict[UUID, Job]
 
-    state: FeedbackState
+    handler: Union[FeedbackInputHandler, None] = None
 
     def __init__(self, user: discord.User):
         self.user = user
         self.feedback = FeedbackModel()
         self.uuid = None
         self.query_cache = {}
-
-        self.state = FeedbackState.NOTHING
 
     @property
     def remaining(self):
@@ -63,6 +158,7 @@ class FeedbackCog(Cog):
         self.fetch_jobs_loop.start()
         await self.user.send("> Started to fetch jobs that need feedback")
 
+    @retry_on_error()
     def fetch_jobs(self):
         """ Fetch jobs from supabase that need feedback """
         results = SUPABASE.table("potential_jobs") \
@@ -83,96 +179,52 @@ class FeedbackCog(Cog):
         self.feedback = FeedbackModel()
         self.job = job
 
-    async def _extract_viability(self, message):
-        """ Parse like/dislike from message """
-        msg = message.content.lower()
-        if msg in ['yes', 'y', 'like']:
-            self.feedback.viability = Viability.LIKE
-            return
-        elif msg in ['no', 'n', 'dislike']:
-            self.feedback.viability = Viability.DISLIKE
-            return
+    def _unload_job(self):
+        """ Restore buffer to cache.
 
-        await self.user.send("Invalid response. Please respond with 'yes' or 'no'")
-        raise ValueError("Invalid response")
+        This is for when feedback mode is exited prematurely.
+        """
+        if self.job and self.uuid:
+            self.query_cache[self.uuid] = self.job
 
-    async def _extract_reason(self, message, aspect: AspectType):
-        stripped = message.content.strip()
-        if stripped == 'skip':
-            return
-        lines = stripped.split('\n')
-        if not lines:
-            await self.user.send("Invalid response. Please provide your comments on this job description.")
-            raise ValueError("Invalid response")
-        if aspect == AspectType.PROS:
-            self.feedback.pros = lines
-        if aspect == AspectType.CONS:
-            self.feedback.cons = lines
-
-    async def _clear_buffer(self):
+    def _clear_buffer(self):
         print("Bad response. Restarted feedback")
         self.feedback = FeedbackModel()
         self.job = None
         self.uuid = None
-        self.state = FeedbackState.WAITING
 
     @Cog.listener()
     async def on_message(self, message: discord.Message):
-        if message.author != self.user:
+        if message.author != self.user or self.handler is None:
             return
-        if self.state == FeedbackState.NOTHING:
+        elif message.content[0] == '!':
             return
-        elif self.state == FeedbackState.LIKE:
-            await self._handle_viability(message)
-        elif self.state == FeedbackState.PROS:
-            await self._handle_pros(message)
-        elif self.state == FeedbackState.CONS:
-            await self._handle_cons(message)
-            await self.begin_conversation()
 
-    async def _handle_viability(self, message: discord.Message):
         try:
-            await self._extract_viability(message)
+            await self.handler.parse_msg(message)
         except ValueError:
-            await self._clear_buffer()
             return
+        self.handler = self.handler.next()
 
-        await self.user.send("## Pros\n"
-                             "What do you like about this job?\n"
-                             "Separate each comment with a new line.")
+        if self.handler:
+            await self.handler.prompt_text(self.job)
+        else:
+            # upload feedback to db
+            self.feedback.upload(self.uuid)
+            await self.user.send("Feedback submitted. Thanks!\n")
+            self._clear_buffer()
 
-        self.state = FeedbackState.PROS
-
-    async def _handle_pros(self, message: discord.Message):
-        try:
-            await self._extract_reason(message, AspectType.PROS)
-        except ValueError:
-            await self._clear_buffer()
-            return
-
-        await self.user.send("## Cons\n"
-                             "What do you *not* like about this job\n"
-                             "Separate each comment with a new line.")
-
-        self.state = FeedbackState.CONS
-
-    async def _handle_cons(self, message: discord.Message):
-        try:
-            await self._extract_reason(message, AspectType.CONS)
-        except ValueError:
-            await self._clear_buffer()
-            return
-
-        # send feedback to supabase
-        self.feedback.upload(self.uuid)
-        await self.user.send("Feedback submitted. Thanks!\n")
+            if self.remaining:
+                await self._first_message()
+            else:
+                await self._announce_finished()
 
     async def _announce_finished(self):
         await self.user.send("So.. it turns out there are no jobs for you to provide feedback on...\n"
                              "...so congrats...\n")
         await self.exit_conversation()
 
-    async def begin_conversation(self):
+    async def begin(self):
         """ Start conversation with user """
         if not self.remaining:
             await self._announce_finished()
@@ -180,28 +232,29 @@ class FeedbackCog(Cog):
 
         await self.disable_loop()
 
+        await self.user.send("Let's get started!...\n"
+                             "Run `!feedback exit` if you have to leave feedback mode.")
+        await self._first_message()
+
+    async def _first_message(self):
         self._load_job()
 
-        await self.user.send("So you ready to provide feedback?...\n"
-                             "Run `!feedback stop` if you have to leave feedback mode."
-                             f"\n\n# {self.job.title}\n")
+        await self.user.send(f"\n\n# {self.job.title}\n")
 
         # divide description into chunks of 2000 characters
         for i in range(0, len(self.job.description), 2000):
             await self.user.send(f"\n{self.job.description[i:i + 2000]}")
 
-        await self.user.send("Great! Let's get started...\n"
-                             "## Viability\n"
-                             "Would you bid on this job? (yes/no)")
-        self.state = FeedbackState.LIKE
+        self.handler = ViabilityHandler(self.user, self.feedback)
+        await self.handler.prompt_text(self.job)
 
     async def exit_conversation(self):
         """ Exit conversation with user """
+        self._unload_job()
         await self.user.send("Exiting feedback mode...")
         await self.enable_loop()
-        self.state = FeedbackState.NOTHING
 
-    @tasks.loop(seconds=60 * 5)
+    @tasks.loop(hours=1)
     async def fetch_jobs_loop(self):
         self.fetch_jobs()
         if self.remaining:

@@ -4,6 +4,7 @@ import feedparser
 from discord import User
 
 from db import SUPABASE
+from helpers import retry_on_error
 
 
 class SearchManager(object):
@@ -56,6 +57,7 @@ class SearchManager(object):
             .eq('id', self.user.id) \
             .execute()
 
+    @retry_on_error()
     def __call__(self) -> list[dict]:
         """ Fetch and parse all RSS feeds """
         entries: list[dict] = []
