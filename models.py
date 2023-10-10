@@ -2,7 +2,6 @@ from enum import IntEnum
 from typing import Union, List
 from uuid import UUID, uuid4
 
-from deprecation import deprecated
 from langchain.pydantic_v1 import BaseModel, Field
 
 from db import SUPABASE
@@ -31,8 +30,8 @@ class FeedbackModel(BaseModel):
 
 
 class Job(object):
-    """Job object to store title and description"""
-    id: UUID = uuid4()
+    """ Job object to store title and description """
+    id: UUID
     title: str
     description: str
     link: str
@@ -40,6 +39,7 @@ class Job(object):
     feedback: Union[FeedbackModel, None] = None
 
     def __init__(self, title: str, description: str, link: str):
+        self.id = uuid4()
         self.title = title
         self.description = description
         self.link = link

@@ -26,7 +26,7 @@ class NewJobsHandler(object):
         formatted = []
         for i in jobs:
             row = {
-                'id': i.id,
+                'id': str(i.id),
                 'title': i.title,
                 'desc': i.description,
                 'link': i.link,
@@ -60,11 +60,12 @@ class NewJobsHandler(object):
             coroutines = [
                 cls._summarizer(jobs),
                 cls._evaluate(jobs),
-                cls._manager(jobs)          # generate embeddings
             ]
             # TODO: notify of valid jobs
 
             await asyncio.gather(*coroutines)
+
+            await cls._manager(jobs)  # generate embeddings after evaluating
 
             cls._store_job(jobs)
         else:
