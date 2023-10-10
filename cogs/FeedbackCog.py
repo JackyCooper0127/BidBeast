@@ -179,38 +179,11 @@ class FeedbackCog(Cog):
         self.feedback = FeedbackModel()
         self.job = job
 
-    async def _extract_viability(self, message):
-        """ Parse like/dislike from message """
-        msg = message.content.lower()
-        if msg in ['yes', 'y', 'like']:
-            self.feedback.viability = Viability.LIKE
-            return
-        elif msg in ['no', 'n', 'dislike']:
-            self.feedback.viability = Viability.DISLIKE
-            return
-
-        await self.user.send("Invalid response. Please respond with 'yes' or 'no'")
-        raise ValueError("Invalid response")
-
-    async def _extract_reason(self, message, aspect: AspectType):
-        stripped = message.content.strip()
-        if stripped == 'skip':
-            return
-        lines = stripped.split('\n')
-        if not lines:
-            await self.user.send("Invalid response. Please provide your comments on this job description.")
-            raise ValueError("Invalid response")
-        if aspect == AspectType.PROS:
-            self.feedback.pros = lines
-        if aspect == AspectType.CONS:
-            self.feedback.cons = lines
-
     def _clear_buffer(self):
         print("Bad response. Restarted feedback")
         self.feedback = FeedbackModel()
         self.job = None
         self.uuid = None
-        self.state = FeedbackState.WAITING
 
     @Cog.listener()
     async def on_message(self, message: discord.Message):
@@ -271,7 +244,6 @@ class FeedbackCog(Cog):
         """ Exit conversation with user """
         await self.user.send("Exiting feedback mode...")
         await self.enable_loop()
-        self.state = FeedbackState.NOTHING
 
     @tasks.loop(seconds=60 * 5)
     async def fetch_jobs_loop(self):
