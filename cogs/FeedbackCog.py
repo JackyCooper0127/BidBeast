@@ -8,6 +8,7 @@ from discord.ext import tasks
 from discord.ext.commands import Cog
 from postgrest.types import CountMethod
 
+from helpers import retry_on_error
 from models import Viability, Job, FeedbackModel
 from db import SUPABASE
 
@@ -157,6 +158,7 @@ class FeedbackCog(Cog):
         self.fetch_jobs_loop.start()
         await self.user.send("> Started to fetch jobs that need feedback")
 
+    @retry_on_error()
     def fetch_jobs(self):
         """ Fetch jobs from supabase that need feedback """
         results = SUPABASE.table("potential_jobs") \
