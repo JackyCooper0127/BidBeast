@@ -47,10 +47,9 @@ class NewJobsHandler(object):
         `FeedbackModel` is returned by `EvaluationFunctor.__call__()` then added to `Job`.
         """
         print(f"Evaluating {len(jobs)} new jobs...")
-        coroutines = [cls._evaluator(i.description) for i in jobs]
-        results = await asyncio.gather(*coroutines)
-        for job, fb in zip(jobs, results):
-            job.feedback = fb
+        # running this synchronously avoids hitting rate limit
+        for job in jobs:
+            job.feedback = await cls._evaluator(job.description)
         print("Finished evaluating jobs")
 
     @classmethod

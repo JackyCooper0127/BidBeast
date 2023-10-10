@@ -7,7 +7,8 @@ import vecs
 from models import Job
 
 # number of related job descriptions to return
-QUERY_MAX: int = 7
+# lowering this number does not hit rate limit
+QUERY_MAX: int = 5
 
 
 def _setup_vector_store() -> vecs.Collection:
@@ -63,7 +64,9 @@ class EmbeddingManager:
 
     @classmethod
     async def __call__(cls, jobs: list[Job]):
+        print(f"Generating embeddings for {len(jobs)} jobs")
         data = [{'id': job.id, 'desc': job.description} for job in jobs]
         cls.generate_embeddings(data)
+        print("Finished generating embeddings")
 
 
