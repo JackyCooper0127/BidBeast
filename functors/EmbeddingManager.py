@@ -7,8 +7,7 @@ import vecs
 from models import Job
 
 # number of related job descriptions to return
-# lowering this number does not hit rate limit
-QUERY_MAX: int = 5
+QUERY_MAX: int = 7
 
 
 def _setup_vector_store() -> vecs.Collection:
