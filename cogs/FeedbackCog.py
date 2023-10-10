@@ -245,7 +245,7 @@ class FeedbackCog(Cog):
         await self.user.send("Exiting feedback mode...")
         await self.enable_loop()
 
-    @tasks.loop(seconds=60 * 5)
+    @tasks.loop(hours=1)
     async def fetch_jobs_loop(self):
         self.fetch_jobs()
         if self.remaining:
