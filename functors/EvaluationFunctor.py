@@ -118,7 +118,7 @@ class EvaluationFunctor:
     @staticmethod
     async def _process_desc(desc: str, examples: list[dict]) -> FeedbackModel:
         _prompt = _evaluation_prompt(examples)
-        llm = OpenAI(temperature=0.2, model_name='gpt-4')
+        llm = OpenAI(temperature=0.2, model_name='gpt-3.5-turbo-16k')
 
         prompt = _prompt.format_prompt(desc=desc).to_string()
         response = await llm.apredict(prompt)
