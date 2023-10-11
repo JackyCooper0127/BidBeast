@@ -54,7 +54,7 @@ class NewJobsHandler(object):
         print("Finished evaluating jobs")
 
     @classmethod
-    async def __call__(cls, jobs: list[Job]):
+    async def __call__(cls, jobs: list[Job]) -> list[Job]:
         if jobs:
             print(f"Found {len(jobs)} new jobs")
             coroutines = [
@@ -68,5 +68,6 @@ class NewJobsHandler(object):
             await cls._manager(jobs)  # generate embeddings after evaluating
 
             cls._store_job(jobs)
+            return jobs
         else:
             print("No new jobs...")

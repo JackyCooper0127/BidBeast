@@ -61,6 +61,10 @@ class MainCog(commands.Cog):
             await self.job_feed.disable_loop()
         elif action == 'status':
             await self.job_feed.status(ctx)
+        elif action == 'list':
+            await self.job_feed.list_cache()
+        elif action == 'clear':
+            await self.job_feed.clear_cache()
         else:
             await ctx.send("Invalid action. Please use `add`, `remove`, `list`, `enable`, `disable` or `status`")
 
