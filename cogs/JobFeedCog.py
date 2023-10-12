@@ -42,7 +42,7 @@ class JobFeedCog(Cog):
         if handled:
             self.cache.extend(handled)
             await self.user.send("# Incoming Jobs\n"
-                                 "Good news! I found {len(handled)} job(s) you might be interested in.")
+                                 f"Good news! I found {len(handled)} job(s) you might be interested in.")
             await self.list_cache(handled)
 
     async def list_cache(self, jobs: Union[list[Job], None] = None) -> NoReturn:
