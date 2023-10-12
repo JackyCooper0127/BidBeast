@@ -95,8 +95,11 @@ class MainCog(commands.Cog):
     @feed.command('list',
                   aliases=['l'],
                   help='list all relevant jobs stored in cache')
-    async def list_feed(self, ctx):
-        await self.job_feed.list_cache()
+    async def list_feed(self, _: commands.Context, number: Optional[int] = None):
+        if number:
+            await self.job_feed.list_details(number)
+        else:
+            await self.job_feed.list_cache()
 
     @feed.command('clear',
                   aliases=['c'],

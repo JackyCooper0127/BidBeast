@@ -38,17 +38,31 @@ class JobFeedCog(Cog):
 
         if handled:
             self.cache.extend(handled)
+            await self.user.send("# Incoming Jobs\n"
+                                 "Good news! I found {len(handled)} job(s) you might be interested in.")
             await self.list_cache(handled)
 
     async def list_cache(self, jobs: Union[list[Job], None] = None) -> NoReturn:
         if jobs is None:
             jobs = self.cache
         if len(jobs):
-            for job in jobs:
-                msg = f"## {job.title}\n{job.summary}\n\n{job.link}"
-                await self.user.send(msg)
+            for index, job in enumerate(jobs):
+                await self.user.send(job.summary_repr(index))
+            await self.user.send("Use `!feed list <num>` to get details of a particular job.")
         else:
             await self.user.send("There are no jobs to show")
+
+    async def list_details(self, index: int):
+        count = len(self.cache)
+        if count == 0:
+            await self.user.send("Job cache is empty")
+        if 0 < index <= count:
+            index -= 1
+            job = self.cache[index]
+            for msg in job.detailed_repr():
+                await self.user.send(msg)
+        else:
+            await self.user.send(f"Error: Please submit a number between 1 and {count}")
 
     def clear_cache(self) -> NoReturn:
         self.cache = []
