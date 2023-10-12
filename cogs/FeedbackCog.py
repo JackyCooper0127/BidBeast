@@ -239,11 +239,8 @@ class FeedbackCog(Cog):
     async def _first_message(self):
         self._load_job()
 
-        await self.user.send(f"\n\n# {self.job.title}\n")
-
-        # divide description into chunks of 2000 characters
-        for i in range(0, len(self.job.description), 2000):
-            await self.user.send(f"\n{self.job.description[i:i + 2000]}")
+        for msg in self.job.detailed_repr():
+            await self.user.send(msg)
 
         self.handler = ViabilityHandler(self.user, self.feedback)
         await self.handler.prompt_text(self.job)
