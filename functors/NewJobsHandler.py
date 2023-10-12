@@ -7,7 +7,7 @@ from db import SUPABASE
 from functors.EmbeddingManager import EmbeddingManager
 from functors.EvaluationFunctor import EvaluationFunctor
 from functors.Summarizer import Summarizer
-from models import Job
+from models import Job, Viability
 
 
 class NewJobsHandler(object):
@@ -53,8 +53,22 @@ class NewJobsHandler(object):
             job.feedback = fb
         print("Finished evaluating jobs")
 
+    @staticmethod
+    def _filter_jobs(jobs: list[Job]):
+        """ From a given list of potential jobs, filter jobs that are viable """
+        filtered = []
+        for i in jobs:
+            if i.feedback.viability == Viability.LIKE:
+                filtered.append(i)
+        return filtered
+
     @classmethod
     async def __call__(cls, jobs: list[Job]) -> list[Job]:
+        """ Process a given list of new jobs.
+
+        A summary and embeddings are generated. Additionally, feedback is automatically generated.
+        Jobs which are evaluated to be viable are returned.
+        """
         if jobs:
             print(f"Found {len(jobs)} new jobs")
             coroutines = [
@@ -68,6 +82,6 @@ class NewJobsHandler(object):
             await cls._manager(jobs)  # generate embeddings after evaluating
 
             cls._store_job(jobs)
-            return jobs
+            return cls._filter_jobs(jobs)
         else:
             print("No new jobs...")
