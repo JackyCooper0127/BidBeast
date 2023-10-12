@@ -63,7 +63,7 @@ class MainCog(commands.Cog):
         await self.job_feed.searches.add_url(args[0])
 
     @feed.command('remove',
-                  aliases=['r'],
+                  aliases=['rm'],
                   help='remove RSS URL from poll group')
     async def remove_search(self, ctx, *args):
         await ctx.send("This function has not been implemented yet")
@@ -91,6 +91,14 @@ class MainCog(commands.Cog):
                   help='return status of background loop')
     async def feed_status(self, ctx):
         await self.job_feed.status(ctx)
+
+    @feed.command('recent',
+                  aliases=['r'],
+                  help='fetch and list recent jobs from db (in hours)')
+    async def load_recent(self, ctx: commands.Context, hours: Optional[int] = 12):
+        await ctx.send(f"Loading viable jobs from the last {hours} hours")
+        self.job_feed.load_recent(hours)
+        await self.job_feed.list_cache()
 
     @feed.command('list',
                   aliases=['l'],

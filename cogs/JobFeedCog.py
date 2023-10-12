@@ -1,13 +1,16 @@
-from typing import ClassVar, Union, Iterator, NoReturn
+from typing import ClassVar, Union, NoReturn
+from datetime import timedelta as td, datetime as dt
+from uuid import UUID
 
 import discord
 from discord.ext import tasks
-from discord.ext.commands import Cog, Bot
+from discord.ext.commands import Cog
 
+from db import SUPABASE
 from functors.FeedParser import FeedParser
 from functors.NewJobsHandler import NewJobsHandler
 from functors.SearchManager import SearchManager
-from models import Job
+from models import Job, Viability
 
 
 class JobFeedCog(Cog):
@@ -66,6 +69,25 @@ class JobFeedCog(Cog):
 
     def clear_cache(self) -> NoReturn:
         self.cache = []
+
+    def load_recent(self, hours: int = 12):
+        delta = td(hours=hours)
+        now = dt.utcnow()
+        diff = now - delta
+
+        cache = []
+        results = SUPABASE.table('potential_jobs') \
+            .select('id, title, desc, summary, link') \
+            .gte('created_at', diff) \
+            .eq('viability', Viability.LIKE) \
+            .execute()
+        for i in results.data:
+            job = Job(i['title'], i['desc'], i['link'])
+            job.summary = i['summary']
+            job.id = UUID(i['id'])
+            cache.append(job)
+        self.cache = cache
+        print(f"Loaded {len(cache)} jobs from db")
 
     async def enable_loop(self):
         """Start the fetching RSS feed"""
