@@ -77,13 +77,13 @@ class MainCog(commands.Cog):
     @feed.command('enable',
                   aliases='e',
                   help='enable background loop to look for and notify about relevant jobs')
-    async def enable_feed(self, ctx):
+    async def enable_feed(self, _: commands.Context):
         await self.job_feed.enable_loop()
 
     @feed.command('disable',
                   aliases='d',
                   help='disable background loop to look for and notify about relevant jobs')
-    async def disable_feed(self, ctx):
+    async def disable_feed(self, _: commands.Context):
         await self.job_feed.disable_loop()
 
     @feed.command('status',
