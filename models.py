@@ -47,6 +47,27 @@ class Job(object):
     def __repr__(self):
         return self.title
 
+    @staticmethod
+    def from_row(row: dict) -> 'Job':
+        """ generates a fully populated `Job` object from a row """
+        # job data
+        for key in ('id', 'title', 'summary', 'desc', 'link'):
+            assert key in row.keys()
+        job = Job(row['title'], row['desc'], row['link'])
+        job.id = row['id']
+        job.summary = row['summary']
+
+        try:
+            for key in ('viability', 'pros', 'cons'):
+                assert key in row.keys()
+            fb = FeedbackModel(pros=row['pros'],
+                               cons=row['cons'],
+                               viability=row['viability'])
+            job.feedback = fb
+        except AssertionError:
+            pass
+        return job
+
     def summary_repr(self, index: Optional[int] = None) -> str:
         prefix = '##'
         if index is not None:
