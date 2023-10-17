@@ -4,27 +4,20 @@ import discord
 from discord.ext.commands.bot import Bot
 from discord.ext import commands
 
+from cogs.BaseAuthenticatedCog import BaseAuthenticatedCog
 from cogs.JobFeedCog import JobFeedCog
 from cogs.FeedbackCog import FeedbackCog
 
 
-async def not_connected(ctx):
-    await ctx.send("You're not connected.\nPlease use `!connect` to connect to the bot.")
-
-
-class MainCog(commands.Cog):
+class MainCog(BaseAuthenticatedCog):
     bot: Bot
-    user: Union[discord.User, None]
-    job_feed: Union[JobFeedCog, None]
-    feedback: Union[FeedbackCog, None]
+    job_feed: Union[JobFeedCog, None] = None
+    feedback: Union[FeedbackCog, None] = None
 
     def __init__(self, bot: Bot):
+        super().__init__(None)
         print("Initializing MainCog")
         self.bot = bot
-        self.user = None
-
-        self.job_feed = None
-        self.feedback = None
 
     @commands.command('connect')
     async def connect(self, ctx):
@@ -162,11 +155,3 @@ class MainCog(commands.Cog):
                       help='update local cache of ambiguous jobs that require feedback')
     async def feedback_status(self, ctx):
         await self.feedback.status()
-
-    async def _check_user(self, ctx) -> bool:
-        """Check if user is connected to the bot"""
-        if self.user != ctx.author:
-            await not_connected(ctx)
-            return True
-        else:
-            return False
