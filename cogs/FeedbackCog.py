@@ -1,16 +1,15 @@
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Union, Dict
+from typing import Union, Dict, Callable
 from uuid import UUID
 
 import discord
 from discord.ext import tasks
 from discord.ext.commands import Cog
-from postgrest.types import CountMethod
 
+from handlers import get_yes_no
 from helpers import retry_on_error
 from models import Viability, Job, FeedbackModel
-from db import SUPABASE
 
 
 class AspectType(Enum):
@@ -46,7 +45,7 @@ class FeedbackInputHandler(ABC):
         self.feedback = feedback
 
     @abstractmethod
-    async def prompt_text(self, job: Job):
+    async def prompt_text(self):
         pass
 
     @abstractmethod
@@ -60,27 +59,24 @@ class FeedbackInputHandler(ABC):
 
 class ViabilityHandler(FeedbackInputHandler):
 
-    async def prompt_text(self, job: Job):
+    async def prompt_text(self):
         msg = ("## Viability\n"
                "Would you bid on this job? (yes/no)")
         return await self.user.send(msg)
 
     async def parse_msg(self, message):
-        msg = message.content.lower()
-        if msg in ['yes', 'y', 'like']:
+        like = get_yes_no(message)
+        if like:
             self.feedback.viability = Viability.LIKE
-        elif msg in ['no', 'n', 'dislike']:
-            self.feedback.viability = Viability.DISLIKE
         else:
-            await self.user.send("Invalid response. Please respond with 'yes' or 'no'")
-            raise ValueError("Invalid response")
+            self.feedback.viability = Viability.DISLIKE
 
     def next(self) -> 'FeedbackInputHandler':
         return ProsHandler(self.user, self.feedback)
 
 
 class ProsHandler(FeedbackInputHandler):
-    async def prompt_text(self, job: Job):
+    async def prompt_text(self):
         msg = ("## Pros\n"
                "What do you like about this job?\n"
                "Separate each comment with a new line.")
@@ -101,7 +97,7 @@ class ProsHandler(FeedbackInputHandler):
 
 
 class ConsHandler(FeedbackInputHandler):
-    async def prompt_text(self, job: Job):
+    async def prompt_text(self):
         msg = ("## Cons\n"
                "What do you *not* like about this job?\n"
                "Separate each comment with a new line.")
@@ -121,23 +117,14 @@ class ConsHandler(FeedbackInputHandler):
         return None
 
 
-async def _get_yes_no(message: discord.Message) -> Union[bool, None]:
-    msg = message.content.lower()
-    if msg in ['yes', 'y']:
-        return True
-    elif msg in ['no', 'n']:
-        return False
-    else:
-        await message.channel.send("Invalid response. Please respond with 'yes' or 'no'")
-        return
-
-
 class FeedbackCog(Cog):
     user: discord.User
     # buffers to store feedback for single job
     feedback: FeedbackModel
     uuid: Union[UUID, None]
     job: Union[Job, None]
+
+    _job_fetcher: Callable[[], list[Job]] = Job.fetch_ambiguous
 
     # cache of jobs that need feedback
     query_cache: Dict[UUID, Job]
@@ -161,16 +148,10 @@ class FeedbackCog(Cog):
     @retry_on_error()
     def fetch_jobs(self):
         """ Fetch jobs from supabase that need feedback """
-        results = SUPABASE.table("potential_jobs") \
-            .select("id", "title", "desc", count=CountMethod.exact) \
-            .eq('viability', -1) \
-            .execute()
-        data = results.data
-        if data:
-            for job in data:
-                uuid = job['id']
-                if uuid != self.uuid:
-                    self.query_cache[uuid] = Job(job['title'], job['desc'], '')
+        for job in self._job_fetcher():
+            uuid = job.id
+            if uuid != self.uuid:
+                self.query_cache[uuid] = job
 
     def _load_job(self):
         """ Load job from cache """
@@ -207,7 +188,7 @@ class FeedbackCog(Cog):
         self.handler = self.handler.next()
 
         if self.handler:
-            await self.handler.prompt_text(self.job)
+            await self.handler.prompt_text()
         else:
             # upload feedback to db
             self.feedback.upload(self.uuid)
@@ -243,7 +224,7 @@ class FeedbackCog(Cog):
             await self.user.send(msg)
 
         self.handler = ViabilityHandler(self.user, self.feedback)
-        await self.handler.prompt_text(self.job)
+        await self.handler.prompt_text()
 
     async def exit_conversation(self):
         """ Exit conversation with user """
