@@ -13,6 +13,15 @@ class Viability(IntEnum):
     DISLIKE = 0
     LIKE = 1
 
+    @property
+    def text(self) -> str:
+        if self == self.LIKE:
+            return "Would Bid"
+        elif self == self.DISLIKE:
+            return "Would Not Bid"
+        else:
+            return "Ambiguous"
+
 
 class FeedbackModel(BaseModel):
     pros: List[str] = Field(description="appealing aspects of this job", default=[])

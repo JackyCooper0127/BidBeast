@@ -7,12 +7,14 @@ from discord.ext import commands
 from cogs.BaseAuthenticatedCog import BaseAuthenticatedCog
 from cogs.JobFeedCog import JobFeedCog
 from cogs.FeedbackCog import FeedbackCog
+from cogs.ReviewCog import ReviewCog
 
 
 class MainCog(BaseAuthenticatedCog):
     bot: Bot
     job_feed: Union[JobFeedCog, None] = None
     feedback: Union[FeedbackCog, None] = None
+    review: Union[ReviewCog, None] = None
 
     def __init__(self, bot: Bot):
         super().__init__(None)
@@ -36,6 +38,10 @@ class MainCog(BaseAuthenticatedCog):
         # setup feedback
         self.feedback = FeedbackCog(self.user)
         await self.bot.add_cog(self.feedback)
+
+        # setup review
+        self.review = ReviewCog(self.user)
+        await self.bot.add_cog(self.review)
 
     # Feed commands
 
