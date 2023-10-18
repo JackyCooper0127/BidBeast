@@ -3,6 +3,7 @@ from typing import Union, List, Optional, Iterator
 from uuid import UUID, uuid4
 
 from langchain.pydantic_v1 import BaseModel, Field
+from postgrest.types import CountMethod
 
 from db import SUPABASE
 
@@ -81,3 +82,31 @@ class Job(object):
         chunk_len = 2000
         for i in range(0, len(self.description), chunk_len):
             yield f"\n{self.description[i:i + chunk_len]}"
+
+    @staticmethod
+    def fetch_ambiguous(*_) -> list['Job']:
+        jobs = []
+        results = SUPABASE.table("potential_jobs") \
+            .select("id", "title", "desc", count=CountMethod.exact) \
+            .eq('viability', -1) \
+            .execute()
+        data = results.data
+        if data:
+            for row in data:
+                job = Job(row['title'], row['desc'], '')
+                job.id = row['id']
+                jobs.append(job)
+        return jobs
+
+    @staticmethod
+    def fetch_unreviewed(*_) -> list['Job']:
+        results = SUPABASE.table('potential_jobs') \
+            .select('id, title, summary, desc, link, viability, cons, pros',
+                    count=CountMethod.exact) \
+            .eq('reviewed', False) \
+            .execute()
+        jobs = []
+        for data in results.data:
+            job = Job.from_row(data)
+            jobs.append(job)
+        return jobs

@@ -179,15 +179,3 @@ class ReviewChain:
             'cons': feedback.cons,
             'viability': feedback.viability,
             'comments': comments})
-
-
-def get_unreviewed() -> list[Job]:
-    results = SUPABASE.table('potential_jobs') \
-        .select('id, title, summary, desc, link, viability, cons, pros') \
-        .eq('reviewed', False) \
-        .execute()
-    jobs = []
-    for data in results.data:
-        job = Job.from_row(data)
-        jobs.append(job)
-    return jobs
