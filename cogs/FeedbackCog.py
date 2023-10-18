@@ -65,10 +65,10 @@ class ViabilityHandler(FeedbackInputHandler):
         return await self.user.send(msg)
 
     async def parse_msg(self, message):
-        like = get_yes_no(message)
-        if like:
+        like = await get_yes_no(message)
+        if like is True:
             self.feedback.viability = Viability.LIKE
-        else:
+        elif like is False:
             self.feedback.viability = Viability.DISLIKE
 
     def next(self) -> 'FeedbackInputHandler':

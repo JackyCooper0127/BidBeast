@@ -42,10 +42,10 @@ class ViabilityHandler(ReviewInputHandler):
         await self.user.send(msg)
 
     async def parse_msg(self, message):
-        like = get_yes_no(message)
-        if like:
+        like = await get_yes_no(message)
+        if like is True:
             self.feedback.viability = Viability.LIKE
-        else:
+        elif like is False:
             self.feedback.viability = Viability.DISLIKE
 
     def next(self) -> 'ReviewInputHandler':
@@ -80,7 +80,7 @@ class ConsHandler(ReviewInputHandler):
         cons = '\n'.join([f"- {i}" for i in self.feedback.cons])
         msg = ("## Cons\n"
                "What do you *not* like about this job?\n"
-               f"Generated Values:\n{cons}"
+               f"Generated Values:\n{cons}\n"
                "Separate each comment with a new line.")
         await self.user.send(msg)
 
@@ -138,7 +138,7 @@ class ReviewCog(BaseAuthenticatedCog):
         """ Load job from cache """
         uuid, job = self.query_cache.popitem()
         self.uuid = uuid
-        self.feedback = FeedbackModel()
+        self.feedback = job.feedback
         self.job = job
 
     def _unload_job(self):
