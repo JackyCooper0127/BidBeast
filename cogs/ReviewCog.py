@@ -57,7 +57,7 @@ class ProsHandler(ReviewInputHandler):
         pros = '\n'.join([f"- {i}" for i in self.feedback.pros])
         msg = ("## Pros\n"
                "What do you like about this job?\n"
-               f"Generated Values:\n{pros}"
+               f"### Generated Values:\n{pros}\n"
                "Separate each comment with a new line.")
         await self.user.send(msg)
 
@@ -80,7 +80,7 @@ class ConsHandler(ReviewInputHandler):
         cons = '\n'.join([f"- {i}" for i in self.feedback.cons])
         msg = ("## Cons\n"
                "What do you *not* like about this job?\n"
-               f"Generated Values:\n{cons}\n"
+               f"### Generated Values:\n{cons}\n"
                "Separate each comment with a new line.")
         await self.user.send(msg)
 
@@ -149,12 +149,6 @@ class ReviewCog(BaseAuthenticatedCog):
         if self.job and self.uuid:
             self.query_cache[self.uuid] = self.job
 
-    def _clear_buffer(self):
-        print("Bad response. Restarted feedback")
-        self.feedback = FeedbackModel()
-        self.job = None
-        self.uuid = None
-
     @Cog.listener()
     async def on_message(self, message: Message):
         if message.author != self.user or self.handler is None:
@@ -174,7 +168,6 @@ class ReviewCog(BaseAuthenticatedCog):
             # upload feedback to db
             self.feedback.upload(self.uuid)
             await self.user.send("Feedback submitted. Thanks!\n")
-            self._clear_buffer()
 
             if self.remaining:
                 await self._first_message()
