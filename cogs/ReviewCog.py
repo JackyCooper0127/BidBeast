@@ -197,27 +197,9 @@ class ReviewCog(BaseAuthenticatedCog):
     @tasks.loop(hours=1)
     async def fetch_jobs_loop(self):
         self.fetch_jobs()
-        if self.remaining:
-            await self.user.send(f"Found {self.remaining} jobs that need review.\n"
-                                 "Use `!review process` to begin processing.")
-        else:
-            return
-
-    async def enable_loop(self):
-        self.fetch_jobs_loop.start()
-        await self.user.send("> Started review loop")
-
-    async def disable_loop(self):
-        self.fetch_jobs_loop.stop()
-        await self.user.send("> Stopped review loop")
-
-    async def status(self):
-        if self.fetch_jobs_loop.is_running():
-            await self.user.send("> Fetching jobs")
-        else:
-            await self.user.send("> Not fetching jobs")
 
     @group('review',
+           aliases=['r'],
            help='review, fix and update generated feedback by providing comments')
     async def review(self, ctx: Context):
         if await self._check_user(ctx):
@@ -225,12 +207,12 @@ class ReviewCog(BaseAuthenticatedCog):
             return
 
         if ctx.invoked_subcommand is None:
-            await ctx.send("No sub-command given. Use `!help review` to learn about available commands.")
+            await ctx.send("No sub-command given. Use `!help review` to see available commands.")
 
-    @review.command('begin',
-                    aliases=['b', 'start'],
+    @review.command('process',
+                    aliases=['p'],
                     help='begin begin to review, fix and update automatically generated feedback')
-    async def begin(self, _: Context):
+    async def process(self, _: Context):
         self.fetch_jobs()
         if not self.remaining:
             await self._announce_finished()
@@ -243,8 +225,42 @@ class ReviewCog(BaseAuthenticatedCog):
         await self._first_message()
 
     @review.command('exit',
-                    aliases=['e', 'quit', 'x', 'q'],
+                    aliases=['quit', 'x', 'q'],
                     help='cancel current input and exit review mode')
     async def exit(self, _: Context):
         self.handler = None
         await self.user.send("Review mode exited!")
+
+    @review.command('enable',
+                    aliases=['e'],
+                    help='enable background loop for processing reviews')
+    async def enable_loop(self, _: Context):
+        self.fetch_jobs_loop.start()
+        await self.user.send("> Started review loop")
+
+    @review.command('disable',
+                    aliases=['d'],
+                    help='disable background loop for processing reviews')
+    async def disable_loop(self, _: Context):
+        self.fetch_jobs_loop.stop()
+        await self.user.send("> Stopped review loop")
+
+    @review.command('status',
+                    aliases=['s'],
+                    help='return status of background notification task for jobs requiring review')
+    async def status(self, _: Context):
+        if self.fetch_jobs_loop.is_running():
+            await self.user.send("> Fetching jobs that require review")
+        else:
+            await self.user.send("> Not fetching jobs that require review")
+
+    @review.command('fetch',
+                    aliases=['f'],
+                    help='update local cache of requiring review')
+    async def fetch(self, _: Context):
+        self.fetch_jobs()
+        if self.remaining:
+            await self.user.send(f"Found {self.remaining} jobs that need review.\n"
+                                 "Use `!review process` to begin processing.")
+        else:
+            return

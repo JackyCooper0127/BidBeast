@@ -6,14 +6,12 @@ from discord.ext import commands
 
 from cogs.BaseAuthenticatedCog import BaseAuthenticatedCog
 from cogs.JobFeedCog import JobFeedCog
-from cogs.FeedbackCog import FeedbackCog
 from cogs.ReviewCog import ReviewCog
 
 
 class MainCog(BaseAuthenticatedCog):
     bot: Bot
     job_feed: Union[JobFeedCog, None] = None
-    feedback: Union[FeedbackCog, None] = None
     review: Union[ReviewCog, None] = None
 
     def __init__(self, bot: Bot):
@@ -34,10 +32,6 @@ class MainCog(BaseAuthenticatedCog):
         # setup job feed
         self.job_feed = JobFeedCog(self.user)
         await self.bot.add_cog(self.job_feed)
-
-        # setup feedback
-        self.feedback = FeedbackCog(self.user)
-        await self.bot.add_cog(self.feedback)
 
         # setup review
         self.review = ReviewCog(self.user)
@@ -113,51 +107,3 @@ class MainCog(BaseAuthenticatedCog):
                   help='clear current cache of relevant jobs')
     async def clear_feed(self, ctx):
         await self.job_feed.clear_cache()
-
-    # Feedback commands
-
-    @commands.group('feedback',
-                    help='manage and provide feedback for ambiguous jobs')
-    async def feedback(self, ctx):
-        if await self._check_user(ctx):
-            await ctx.send("User is not authenticated")
-            return
-
-        if ctx.invoked_subcommand is None:
-            await ctx.send("No sub-command given. Use `!help feed` to learn about available commands.")
-
-    @feedback.command('process',
-                      aliases=['p'],
-                      help='begin to process feedback for jobs that could not be automatically evaluated')
-    async def process_feedback(self, ctx):
-        await self.feedback.begin()
-
-    @feedback.command('quit',
-                      aliases=['q'],
-                      help='quit from processing feedback')
-    async def quit_feedback(self, ctx):
-        await self.feedback.exit_conversation()
-
-    @feedback.command('enable',
-                      aliases=['e'],
-                      help='enable background loop for processing feedback')
-    async def enable_feedback(self, ctx):
-        await self.feedback.exit_conversation()
-
-    @feedback.command('disable',
-                      aliases=['d'],
-                      help='disable background loop for processing feedback')
-    async def disable_feedback(self, ctx):
-        await self.feedback.exit_conversation()
-
-    @feedback.command('status',
-                      aliases=['s'],
-                      help='return status of background feedback notification task')
-    async def fetch_feedback(self, ctx):
-        await self.feedback.status()
-
-    @feedback.command('fetch',
-                      aliases=['f'],
-                      help='update local cache of ambiguous jobs that require feedback')
-    async def feedback_status(self, ctx):
-        await self.feedback.status()
