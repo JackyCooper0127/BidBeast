@@ -268,6 +268,7 @@ class ReviewCog(BaseAuthenticatedCog):
         await self._disable_loop()
 
     async def _disable_loop(self):
+        self.fetch_jobs_loop.cancel()
         self.fetch_jobs_loop.stop()
         await self.user.send("> Stopped review loop")
 
