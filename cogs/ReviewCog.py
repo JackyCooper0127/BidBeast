@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import ClassVar, Union, Dict, Callable
+from typing import Union, Dict, Callable
 from uuid import UUID
 
 from discord import User, Message
@@ -56,14 +56,24 @@ class ProsHandler(ReviewInputHandler):
     async def prompt_text(self):
         pros = '\n'.join([f"- {i}" for i in self.feedback.pros])
         msg = ("## Pros\n"
-               "What do you like about this job?\n"
-               f"### Generated Values:\n{pros}\n"
-               "Separate each comment with a new line.")
+               "What do you like about this job?\n")
+        if pros:
+            msg += (f"### Generated Values:\n{pros}\n"
+                    "Separate each comment with a new line.\n"
+                    "Enter 'skip' if you're satisfied with the generated output above.\n"
+                    "Enter 'none' if to submit no comments.")
+        else:
+            msg += ("Separate each comment with a new line.\n"
+                    "Enter 'skip' or 'none' if there are no comments you'd like to add.")
         await self.user.send(msg)
 
     async def parse_msg(self, message):
         stripped = message.content.strip()
-        if stripped == 'skip':
+        lower = stripped.lower()
+        if lower == 'skip':
+            return
+        elif lower == 'none':
+            self.feedback.pros = []
             return
         lines = stripped.split('\n')
         if not lines:
@@ -79,14 +89,24 @@ class ConsHandler(ReviewInputHandler):
     async def prompt_text(self):
         cons = '\n'.join([f"- {i}" for i in self.feedback.cons])
         msg = ("## Cons\n"
-               "What do you *not* like about this job?\n"
-               f"### Generated Values:\n{cons}\n"
-               "Separate each comment with a new line.")
+               "What do you *not* like about this job?\n")
+        if cons:
+            msg += (f"### Generated Values:\n{cons}\n"
+                    "Separate each comment with a new line.\n"
+                    "Enter 'skip' if you're satisfied with the generated output above.\n"
+                    "Enter 'none' if to submit no comments.")
+        else:
+            msg += ("Separate each comment with a new line.\n"
+                    "Enter 'skip' or 'none' if there are no comments you'd like to add.")
         await self.user.send(msg)
 
     async def parse_msg(self, message):
         stripped = message.content.strip()
-        if stripped == 'skip':
+        lower = stripped.lower()
+        if lower == 'skip':
+            return
+        elif lower == 'none':
+            self.feedback.cons = []
             return
         lines = stripped.split('\n')
         if not lines:
