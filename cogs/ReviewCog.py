@@ -190,9 +190,10 @@ class ReviewCog(BaseAuthenticatedCog):
 
     async def exit_conversation(self):
         """ Exit conversation with user """
+        self.handler = None
         self._unload_job()
-        await self.user.send("Exiting feedback mode...")
-        await self.enable_loop()
+        await self.user.send("Exiting review mode...")
+        await self._enable_loop()
 
     @tasks.loop(hours=1)
     async def fetch_jobs_loop(self):
@@ -218,7 +219,7 @@ class ReviewCog(BaseAuthenticatedCog):
             await self._announce_finished()
             return
 
-        await self.disable_loop()
+        await self._disable_loop()
 
         await self.user.send("Let's get started!\n"
                              "Run `!review exit` to leave review mode")
@@ -228,13 +229,15 @@ class ReviewCog(BaseAuthenticatedCog):
                     aliases=['quit', 'x', 'q'],
                     help='cancel current input and exit review mode')
     async def exit(self, _: Context):
-        self.handler = None
-        await self.user.send("Review mode exited!")
+        await self.exit_conversation()
 
     @review.command('enable',
                     aliases=['e'],
                     help='enable background loop for processing reviews')
     async def enable_loop(self, _: Context):
+        await self._enable_loop()
+
+    async def _enable_loop(self):
         self.fetch_jobs_loop.start()
         await self.user.send("> Started review loop")
 
@@ -242,6 +245,9 @@ class ReviewCog(BaseAuthenticatedCog):
                     aliases=['d'],
                     help='disable background loop for processing reviews')
     async def disable_loop(self, _: Context):
+        await self._disable_loop()
+
+    async def _disable_loop(self):
         self.fetch_jobs_loop.stop()
         await self.user.send("> Stopped review loop")
 
